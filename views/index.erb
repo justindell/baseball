@@ -1,0 +1,50 @@
+<html>
+  <head>
+    <link rel="stylesheet" type="text/css" href="css/reset.css">
+    <link rel="stylesheet" type="text/css" href="css/main.css">
+  </head>
+<body>
+  <table>
+    <thead>
+      <th>Player</th>
+      <th>Team</th>
+      <th>Position</th>
+      <th>Value</th>
+      <th>Yahoo</th>
+      <th></th>
+    </thead>
+    <tbody>
+      <% @players.each_with_index do |player, idx| %>
+        <tr id="<%= player[:id] %>" class="<%= idx % 2 == 0  ? 'even' : 'odd' %><%= " drafted" if player[:drafted] %>">
+          <td><%= player[:name] %></td>
+          <td><%= player[:team] %></td>
+          <td><%= player[:position] %></td>
+          <td><%= sprintf("%0.3f", player[:value]) %></td>
+          <td>$<%= sprintf("%0d", player[:yahoo_value]) %></td>
+          <td>
+            <% unless player[:drafted] %>
+              <form class= "draft" action="draft" method="post">
+                <input type="hidden" name="player_id" value=<%= player[:id] %> />
+                <input type="submit" value="draft" />
+              </form>
+            <% end %>
+          </td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+  <div id='query'>
+    <a href="/">All</a>
+    <a href="/batters">Batters</a>
+    <a href="/pitchers">Pitchers</a><br />
+    <form action="/" method="get">
+      Position: <input type="text" name="position" /><br />
+      <input type="submit" value="Search" />
+    </form>
+  </div>
+</body>
+<foot>
+  <script language="javascript" type="text/javascript" src="/javascripts/jquery-1.7.1.min.js" ></script>
+  <script language="javascript" type="text/javascript" src="/javascripts/colorize.js" ></script>
+</foot>
+</html>

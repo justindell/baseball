@@ -1,0 +1,37 @@
+table {
+  margin: 20px 0px 0px 20px;
+}
+
+tr {
+  border: none;
+  margin: 0px;
+  padding: 0px;
+}
+
+th, td {
+  text-align: left;
+  padding-right: 5px;
+  font-weight: bold;
+  min-width: 45px;
+}
+
+.red { color: red; }
+.orange { color: orange; }
+.green { color: green; }
+.blue { color: blue; }
+.even { background: #DDD; }
+
+.drafted {
+  color: gray;
+  text-decoration: line-through;
+  font-weight: none;
+}
+
+#query {
+  position: fixed;
+  border: double black;
+  left: 800px;
+  top: 30px;
+  padding: 20px;
+}
+
