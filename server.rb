@@ -15,11 +15,11 @@ get '/batters' do
 end
 
 get '/pitchers' do
-  @players = Calculate.pitchers
+  @players = Calculate.pitchers params
   erb :pitchers
 end
 
 post '/draft' do
   Calculate.draft params[:player_id] 
-  redirect to('/')
+  redirect to('/pitchers')
 end

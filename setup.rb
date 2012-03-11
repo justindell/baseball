@@ -25,6 +25,11 @@ DB.create_table :players do
   Decimal :value
   Decimal :yahoo_value
   TrueClass :drafted, :default => false
+  TrueClass :list_of_twelve, :default => false
+  TrueClass :sleeper, :default => false
+  TrueClass :injury, :default => false
+  TrueClass :favorite, :default => false
+  TrueClass :prospect, :default => false
 end
 
 DB.add_index :players, :id

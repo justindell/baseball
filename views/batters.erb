@@ -22,8 +22,13 @@
     </thead>
     <tbody>
       <% @players.each_with_index do |player, idx| %>
-        <tr id="<%= player[:id] %>" class="<%= idx % 2 == 0  ? 'even' : 'odd' %><%= " drafted" if player[:drafted] %>">
-          <td><%= player[:name] %></td>
+        <tr id="<%= player[:id] %>" class="<%= " drafted" if player[:drafted] %>">
+          <td>
+            <% if player[:injury] %><img height=16px width=16px src="css/injury.png" /><% end %>
+            <% if player[:prospect] %><img height=16px width=16px src="css/fire.png" /><% end %>
+            <% if player[:favorite] %><img height=16px width=16px src="css/star.png" /><% end %>
+            <%= "#{idx + 1}. #{player[:name]}" %>
+          </td>
           <td><%= player[:team] %></td>
           <td><%= player[:position] %></td>
           <td><%= sprintf("%0.3f", player[:value]) %></td>
@@ -52,6 +57,7 @@
     <a href="/pitchers">Pitchers</a><br />
     <form action="/batters" method="get">
       Position: <input type="text" name="position" /><br />
+      Hide Drafted: <input type="checkbox" name="hide-drafted" /><br />
       <input type="submit" value="Search" />
     </form>
   </div>

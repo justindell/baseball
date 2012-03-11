@@ -7,17 +7,22 @@ class Calculate
     def players opts = {}
       query = DB[:players].order(:value).reverse
       query = query.filter(:position.like("%#{opts['position'].upcase}%")) if opts['position']
+      query = query.filter(:drafted => false) if opts['hide-drafted']
       query.all
     end
 
     def batters opts = {}
-      query = DB[:players].filter(~{:position => 'P'}).order(:value).reverse
+      query = DB[:players].exclude(:position.like('%P')).order(:value).reverse
       query = query.filter(:position.like("%#{opts['position'].upcase}%")) if opts['position']
+      query = query.filter(:drafted => false) if opts['hide-drafted']
       query.all
     end
 
     def pitchers opts = {}
-      DB[:players].filter(:position => 'P').order(:value).reverse.all
+      query = DB[:players].filter(:position.like('%P')).order(:value).reverse
+      query = query.filter(:position => opts['position'].upcase) if opts['position']
+      query = query.filter(:drafted => false) if opts['hide-drafted']
+      query.all
     end
 
     def draft player_id
