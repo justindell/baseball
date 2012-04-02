@@ -57,6 +57,7 @@
     <a href="/pitchers">Pitchers</a><br />
     <form action="/batters" method="get">
       Position: <input type="text" name="position" /><br />
+      Limit: <input type="text" name="limit" /><br />
       Hide Drafted: <input type="checkbox" name="hide-drafted" /><br />
       <input type="submit" value="Search" />
     </form>
@@ -65,10 +66,11 @@
 <foot>
   <script language="javascript" type="text/javascript" src="/javascripts/jquery-1.7.1.min.js" ></script>
   <script language="javascript" type="text/javascript" src="/javascripts/jquery-tablesorter.min.js" ></script>
-  <script language="javascript" type="text/javascript" src="/javascripts/colorize.js" ></script>
+  <script language="javascript" type="text/javascript" src="/javascripts/jquery.heatcolor.0.0.1.pack.js" ></script>
   <script>
     $(document).ready(function() { 
-      $("#batters_table").tablesorter({headers: { 11: { sorter: false }}});
+      $("#batters_table").tablesorter();
+      $('#batters_table > tbody > tr').heatcolor(function() { return $("td:nth-child(4)",this).text(); });
     });
   </script> 
 </foot>

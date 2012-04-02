@@ -7,6 +7,7 @@ class Calculate
     def players opts = {}
       query = DB[:players].order(:value).reverse
       query = query.filter(:position.like("%#{opts['position'].upcase}%")) if opts['position']
+      query = opts['limit'] ? query.limit(opts['limit']) : query.limit(500)
       query = query.filter(:drafted => false) if opts['hide-drafted']
       query.all
     end
@@ -14,13 +15,14 @@ class Calculate
     def batters opts = {}
       query = DB[:players].exclude(:position.like('%P')).order(:value).reverse
       query = query.filter(:position.like("%#{opts['position'].upcase}%")) if opts['position']
+      query = opts['limit'] ? query.limit(opts['limit']) : query.limit(500)
       query = query.filter(:drafted => false) if opts['hide-drafted']
       query.all
     end
 
     def pitchers opts = {}
       query = DB[:players].filter(:position.like('%P')).order(:value).reverse
-      query = query.filter(:position => opts['position'].upcase) if opts['position']
+      query = opts['limit'] ? query.limit(opts['limit']) : query.limit(500)
       query = query.filter(:drafted => false) if opts['hide-drafted']
       query.all
     end

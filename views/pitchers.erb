@@ -15,7 +15,7 @@
       <th>K</th>
       <th>S</th>
       <th>ERA</th>
-      <th>WHIP</th>
+      <th>Whip</th>
       <th>Yahoo</th>
       <th></th>
     </thead>
@@ -55,7 +55,7 @@
     <a href="/batters">Batters</a>
     <a href="/pitchers">Pitchers</a><br />
     <form action="/pitchers" method="get">
-      Position: <input type="text" name="position" /><br />
+      Limit: <input type="text" name="limit" /><br />
       Hide Drafted: <input type="checkbox" name="hide-drafted" /><br />
       <input type="submit" value="Search" />
     </form>
@@ -64,10 +64,11 @@
 <foot>
   <script language="javascript" type="text/javascript" src="/javascripts/jquery-1.7.1.min.js" ></script>
   <script language="javascript" type="text/javascript" src="/javascripts/jquery-tablesorter.min.js" ></script>
-  <script language="javascript" type="text/javascript" src="/javascripts/colorize.js" ></script>
+  <script language="javascript" type="text/javascript" src="/javascripts/jquery.heatcolor.0.0.1.pack.js" ></script>
   <script>
     $(document).ready(function() { 
-      $("#players_table").tablesorter({headers: { 10: { sorter: false }}});
+      $("#players_table").tablesorter();
+      $("#players_table > tbody > tr").heatcolor(function() { return $("td:nth-child(4)",this).text(); });
     });
   </script> 
 </foot>

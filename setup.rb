@@ -21,7 +21,8 @@ DB.create_table :players do
   Decimal :k
   Decimal :s
   Decimal :era
-  Decimal :whip
+  Decimal :h_per_nine
+  Decimal :bb_per_nine
   Decimal :value
   Decimal :yahoo_value
   TrueClass :drafted, :default => false
@@ -42,13 +43,20 @@ def std_dev values
   Math.sqrt( values.inject(0) { |sum, e| sum + (e - mean) ** 2 } / count.to_f )
 end
 
-def parse_csv categories, type
+def parse_csv type
+  categories = ['r', 'hr', 'rbi', 'sb', 'avg', 'obp'] if type == :batters
+  categories = ['w', 'k', 's', 'era'] if type == :pitchers
   players = {}
   csv_file = type == :batters ? 'batter_projections.csv' : 'pitcher_projections.csv'
   CSV.open(csv_file, {:headers => true, :header_converters => :downcase}).each do |row|
+    puts row['player']
     players[row['player']] = {'pos' => row['pos'], 'team' => row['team'], 'value' => 0}
     categories.each{|c| players[row['player']][c] = row[c.downcase].to_f}
-    ['era', 'whip'].each {|p| players[row['player']][p] *= -1 } if type == :pitchers
+    if type == :pitchers
+      players[row['player']]['h_per_nine'] = (row['h'].to_f * 9) / row['ip'].to_f
+      players[row['player']]['bb_per_nine'] = (row['bb'].to_f * 9) / row['ip'].to_f
+      ['era', 'h_per_nine', 'bb_per_nine'].each {|p| players[row['player']][p] *= -1 }
+    end
   end
   players
 end
@@ -67,9 +75,8 @@ def calculate players, stat
   end
 end
 
-categories = ['r', 'hr', 'rbi', 'sb', 'avg', 'obp']
-players = parse_csv categories, :batters
-categories.each {|stat| calculate players, stat}
+players = parse_csv :batters
+['r', 'hr', 'rbi', 'sb', 'avg', 'obp'].each {|stat| calculate players, stat}
 players.each do |name, player|
   @players_table.insert :name => name,
                  :team => player['team'],
@@ -83,9 +90,8 @@ players.each do |name, player|
                  :position => player['pos']
 end
 
-categories = ['w', 'k', 's', 'era', 'whip']
-players = parse_csv categories, :pitchers
-categories.each {|stat| calculate players, stat}
+players = parse_csv :pitchers
+['w', 'k', 's', 'era', 'h_per_nine', 'bb_per_nine'].each {|stat| calculate players, stat}
 players.each do |name, player|
   @players_table.insert :name => name,
                  :team => player['team'],
@@ -94,19 +100,10 @@ players.each do |name, player|
                  :k => player['k'],
                  :s => player['s'],
                  :era => player['era'],
-                 :whip => player['whip'],
+                 :h_per_nine => player['h_per_nine'],
+                 :bb_per_nine => player['bb_per_nine'],
                  :position => 'P'
 end
-
-
-puts "Updating drafted players"
-@players_table.filter(:name => [ 'Freddie Freeman', 'Jordan Zimmermann', 'Ian Kinsler', 'Brian Wilson', 'Jacoby Ellsbury',
-'Matt Kemp', 'Jose Reyes', 'Andrew McCutchen', 'Jose Bautista', 'Desmond Jennings', 'Madison Bumgarner', 'James Shields',
-'Mat Latos', 'Carlos Gonzalez', 'Mike Napoli', 'Rafael Betancourt', 'Brett Lawrie', 'Michael Cuddyer', 'Stephen Strasburg',
-'Craig Kimbrel', 'Giancarlo Stanton', 'Eric Hosmer', 'Chris Young', 'Mark Trumbo', 'Josh Hamilton', 'Adrian Beltre',
-'Pablo Sandoval', 'Dan Uggla', 'Ian Kennedy', 'C.J. Wilson', 'Curtis Granderson', 'Carlos Santana', 'Elvis Andrus',
-'Matt Cain', 'Prince Fielder', 'Hunter Pence', 'Tim Lincecum', 'Neftali Feliz', 'Robinson Cano', 'Starlin Castro',
-'David Price', 'Adam Wainwright', 'David Freese', 'J.J. Putz', 'Ryan Madson']).update(:drafted => true)
 
 puts "Updating yahoo values"
 @players_table.update(:yahoo_value => -1)
