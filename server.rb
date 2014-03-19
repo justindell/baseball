@@ -21,5 +21,5 @@ end
 
 post '/draft' do
   Calculate.draft params[:player_id] 
-  redirect to('/pitchers')
+  redirect back
 end

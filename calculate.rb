@@ -15,7 +15,7 @@ class Calculate
     def batters opts = {}
       query = DB[:players].exclude(:position.like('%P')).order(:value).reverse
       query = query.filter(:position.like("%#{opts['position'].upcase}%")) if opts['position']
-      query = opts['limit'] ? query.limit(opts['limit']) : query.limit(500)
+      query = opts['limit'] ? (!opts['limit'].empty? ? query.limit(opts['limit']) : query.limit(20)) : query.limit(500)
       query = query.filter(:drafted => false) if opts['hide-drafted']
       query.all
     end

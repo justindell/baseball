@@ -110,3 +110,23 @@ puts "Updating yahoo values"
 CSV.open('yahoo_values.csv', {:headers => true, :header_converters => :downcase}).each do |row|
   @players_table.filter(:name => row['player']).update(:yahoo_value => row['value'].to_i)
 end
+
+puts "updating list of 12"
+@players_table.filter(:name => 'Madison Bumgarner').update(:list_of_twelve => true)
+@players_table.filter(:name => 'Jordan Zimmermann').update(:list_of_twelve => true)
+@players_table.filter(:name => 'Mat Latos').update(:list_of_twelve => true)
+@players_table.filter(:name => 'Doug Fister').update(:list_of_twelve => true)
+@players_table.filter(:name => 'Jaime Garcia').update(:list_of_twelve => true)
+@players_table.filter(:name => 'Ryan Vogelsong').update(:list_of_twelve => true)
+@players_table.filter(:name => 'Jon Niese').update(:list_of_twelve => true)
+@players_table.filter(:name => 'Homer Bailey').update(:list_of_twelve => true)
+@players_table.filter(:name => 'Matt Harrison').update(:list_of_twelve => true)
+@players_table.filter(:name => 'James McDonald').update(:list_of_twelve => true)
+@players_table.filter(:name => 'Derek Holland').update(:list_of_twelve => true)
+@players_table.filter(:name => 'Phil Hughes').update(:list_of_twelve => true)
+@players_table.filter(:name => 'Bud Norris').update(:list_of_twelve => true)
+@players_table.filter(:name => 'Tommy Hanson').update(:list_of_twelve => true)
+@players_table.filter(:name => 'Clay Buchholz').update(:list_of_twelve => true)
+@players_table.filter(:name => 'Mike Leake').update(:list_of_twelve => true)
+@players_table.filter(:name => 'Jerome Williams').update(:list_of_twelve => true)
+@players_table.filter(:name => 'J.A. Happ').update(:list_of_twelve => true)
