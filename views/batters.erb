@@ -30,7 +30,7 @@
             <%= "#{idx + 1}. #{player[:name]}" %>
           </td>
           <td><%= player[:team] %></td>
-          <td><%= player[:position] %></td>
+          <td><a href="/batters?position=<%= player[:position] %>&limit=20"><%= player[:position] %></a></td>
           <td><%= sprintf("%0.3f", player[:value]) %></td>
           <td><%= sprintf("%d", player[:r]) %></td>
           <td><%= sprintf("%d", player[:hr]) %></td>

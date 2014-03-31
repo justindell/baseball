@@ -144,7 +144,7 @@ puts "updating keepers"
 @players_table.filter(:name => 'Hamilton, Billy').update(:drafted => true)
 @players_table.filter(:name => 'Jones, Adam').update(:drafted => true)
 @players_table.filter(:name => 'Adams, Matt').update(:drafted => true)
-@players_table.filter(:name => 'Prado, Martín').update(:drafted => true)
+@players_table.filter(:name => 'Prado, Martin').update(:drafted => true)
 @players_table.filter(:name => 'Choo, Shin Shoo').update(:drafted => true)
 @players_table.filter(:name => 'Kipnis, Jason').update(:drafted => true)
 @players_table.filter(:name => 'Holland, Greg').update(:drafted => true)
