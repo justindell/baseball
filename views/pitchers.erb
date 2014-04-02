@@ -11,12 +11,12 @@
       <th>Team</th>
       <th>Position</th>
       <th>Value</th>
-      <th>W</th>
       <th>K</th>
       <th>S</th>
       <th>ERA</th>
       <th>H/9</th>
       <th>BB/9</th>
+      <th>QS</th>
       <th>Yahoo</th>
       <th></th>
     </thead>
@@ -33,12 +33,12 @@
           <td><%= player[:team] %></td>
           <td><%= player[:position] %></td>
           <td><%= sprintf("%0.3f", player[:value]) %></td>
-          <td><%= sprintf("%d", player[:w]) %></td>
           <td><%= sprintf("%d", player[:k]) %></td>
           <td><%= sprintf("%d", player[:s]) %></td>
           <td><%= sprintf("%0.3f", player[:era]) %></td>
           <td><%= sprintf("%0.3f", player[:h_per_nine]) %></td>
           <td><%= sprintf("%0.3f", player[:bb_per_nine]) %></td>
+          <td><%= sprintf("%d", player[:qs]) %></td>
           <td>$<%= sprintf("%0d", player[:yahoo_value]) %></td>
           <td>
             <% unless player[:drafted] %>
