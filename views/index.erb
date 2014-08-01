@@ -1,10 +1,11 @@
 <html>
   <head>
     <link rel="stylesheet" type="text/css" href="css/reset.css">
+    <link rel="stylesheet" type="text/css" href="css/style.css">
     <link rel="stylesheet" type="text/css" href="css/main.css">
   </head>
 <body>
-  <table>
+  <table id="players_table" class="tablesorter">
     <thead>
       <th>Player</th>
       <th>Team</th>
@@ -53,5 +54,12 @@
 <foot>
   <script language="javascript" type="text/javascript" src="/javascripts/jquery-1.7.1.min.js" ></script>
   <script language="javascript" type="text/javascript" src="/javascripts/colorize.js" ></script>
+  <script language="javascript" type="text/javascript" src="/javascripts/jquery.heatcolor.0.0.1.pack.js" ></script>
+  <script>
+    $(document).ready(function() { 
+      $("#players_table").tablesorter();
+      $('#players_table > tbody > tr').heatcolor(function() { return $("td:nth-child(4)",this).text(); });
+    });
+  </script> 
 </foot>
 </html>

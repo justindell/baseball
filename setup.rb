@@ -25,8 +25,9 @@ DB.create_table :players do
   Decimal :qs
   Decimal :h_per_nine
   Decimal :bb_per_nine
+  Decimal :war
   Decimal :value
-  Decimal :yahoo_value
+  Decimal :yahoo_value, :default => 0
   TrueClass :drafted, :default => false
   TrueClass :list_of_twelve, :default => false
   TrueClass :sleeper, :default => false
@@ -50,9 +51,9 @@ def parse_csv file, type
   CSV.open(file, {:headers => true, :header_converters => :downcase}).each do |row|
     categories = type == :batter ?
       ['r', 'hr', 'rbi', 'sb', 'avg', 'obp'] : 
-      ['k', 's', 'era', 'qs']
-    players[row['name']] = {'type' => type.to_s, 'pos' => row['pos'], 'team' => row['tm'], 'value' => 0}
-    categories.each{|c| players[row['name']][c] = row[c.downcase].to_f}
+      ['k', 's', 'era', 'war']
+    players[row['name']] = {'type' => type.to_s, 'value' => 0}
+    categories.each{|c| players[row['name']][c] = row[c].to_f}
     if type == :pitcher
       players[row['name']]['h_per_nine'] = (row['h'].to_f * 9) / row['ip'].to_f
       players[row['name']]['bb_per_nine'] = (row['bb'].to_f * 9) / row['ip'].to_f
@@ -76,35 +77,33 @@ def calculate players, stat
   end
 end
 
-batters = parse_csv 'data/special_blend_batters.csv', :batter
+batters = parse_csv 'data/batters_mid.csv', :batter
 ['r', 'hr', 'rbi', 'sb', 'avg', 'obp'] .each do |stat|
   calculate batters, stat
 end
-pitchers = parse_csv 'data/special_blend_pitchers.csv', :pitcher
-['k', 's', 'era', 'h_per_nine', 'bb_per_nine', 'qs'].each do |stat|
+pitchers = parse_csv 'data/pitchers_mid.csv', :pitcher
+['k', 's', 'era', 'h_per_nine', 'bb_per_nine', 'war'].each do |stat|
   calculate pitchers, stat
 end
 
 puts "inserting players"
 batters.merge(pitchers).each do |name, player|
-  @players_table.insert :name => name,
-                 :team => player['team'],
-                 :type => player['type'],
-                 :value => player['value'],
-                 :r => player['r'],
-                 :hr => player['hr'],
-                 :rbi => player['rbi'],
-                 :sb => player['sb'],
-                 :avg => player['avg'],
-                 :obp => player['obp'],
-                 :position => player['pos'],
-                 :k => player['k'],
-                 :s => player['s'],
-                 :era => player['era'],
-                 :qs => player['qs'],
-                 :h_per_nine => player['h_per_nine'],
-                 :bb_per_nine => player['bb_per_nine'],
-                 :yahoo_value => 0 #player['yahoo_value']
+  @players_table.insert(
+    :name => name,
+    :type => player['type'],
+    :value => player['value'],
+    :r => player['r'],
+    :hr => player['hr'],
+    :rbi => player['rbi'],
+    :sb => player['sb'],
+    :avg => player['avg'],
+    :obp => player['obp'],
+    :k => player['k'],
+    :s => player['s'],
+    :era => player['era'],
+    :h_per_nine => player['h_per_nine'],
+    :bb_per_nine => player['bb_per_nine'],
+    :war => player['war'])
 end
 
 #puts "updating list of 12"

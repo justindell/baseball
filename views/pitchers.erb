@@ -16,7 +16,7 @@
       <th>ERA</th>
       <th>H/9</th>
       <th>BB/9</th>
-      <th>QS</th>
+      <th>WAR</th>
       <th>Yahoo</th>
       <th></th>
     </thead>
@@ -38,7 +38,7 @@
           <td><%= sprintf("%0.3f", player[:era]) %></td>
           <td><%= sprintf("%0.3f", player[:h_per_nine]) %></td>
           <td><%= sprintf("%0.3f", player[:bb_per_nine]) %></td>
-          <td><%= sprintf("%d", player[:qs]) %></td>
+          <td><%= sprintf("%0.3f", player[:war]) %></td>
           <td>$<%= sprintf("%0d", player[:yahoo_value]) %></td>
           <td>
             <% unless player[:drafted] %>
