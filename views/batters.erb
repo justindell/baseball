@@ -26,6 +26,7 @@
           <td>
             <% if player[:injury] %><img height=16px width=16px src="css/injury.png" /><% end %>
             <% if player[:prospect] %><img height=16px width=16px src="css/fire.png" /><% end %>
+            <% if player[:rookie] %><img height=16px width=16px src="css/diamond.png" /><% end %>
             <% if player[:favorite] %><img height=16px width=16px src="css/star.png" /><% end %>
             <%= "#{idx + 1}. #{player[:name]}" %>
           </td>
@@ -51,17 +52,7 @@
       <% end %>
     </tbody>
   </table>
-  <div id='query'>
-    <a href="/">All</a>
-    <a href="/batters">Batters</a>
-    <a href="/pitchers">Pitchers</a><br />
-    <form action="/batters" method="get">
-      Position: <input type="text" name="position" /><br />
-      Limit: <input type="text" name="limit" /><br />
-      Hide Drafted: <input type="checkbox" name="hide-drafted" /><br />
-      <input type="submit" value="Search" />
-    </form>
-  </div>
+  <%= erb :_search_box %>
 </body>
 <foot>
   <script language="javascript" type="text/javascript" src="/javascripts/jquery-1.7.1.min.js" ></script>

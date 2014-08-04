@@ -1,5 +1,6 @@
 require 'sinatra'
 require 'thin'
+require 'mechanize'
 require './calculate'
 
 set(:css_dir) { File.join(views, 'css') }

@@ -1,0 +1,11 @@
+<div id='query'>
+  <a href="/">All</a>
+  <a href="/batters">Batters</a>
+  <a href="/pitchers">Pitchers</a><br />
+  <form action="/batters" method="get">
+    Position: <input type="text" name="position" value="<%= params[:position] %>"/><br />
+    Limit: <input type="text" name="limit" value="<%= params[:limit] %>"/><br />
+    Hide Drafted: <input type="checkbox" name="hide-drafted" <%= "checked" if params['hide-drafted'] == 'on' %>/><br />
+    <input type="submit" value="Search" />
+  </form>
+</div>

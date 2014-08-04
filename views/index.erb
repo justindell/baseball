@@ -16,10 +16,11 @@
     </thead>
     <tbody>
       <% @players.each_with_index do |player, idx| %>
-        <tr id="<%= player[:id] %>" class="<%= idx % 2 == 0  ? 'even' : 'odd' %><%= " drafted" if player[:drafted] %>">
+        <tr id="<%= player[:id] %>" class="<%= "drafted" if player[:drafted] %>">
           <td>
             <% if player[:injury] %><img height=16px width=16px src="css/injury.png" /><% end %>
             <% if player[:prospect] %><img height=16px width=16px src="css/fire.png" /><% end %>
+            <% if player[:rookie] %><img height=16px width=16px src="css/diamond.png" /><% end %>
             <% if player[:favorite] %><img height=16px width=16px src="css/star.png" /><% end %>
             <%= "#{idx + 1}. #{player[:name]}" %>
           </td>
@@ -39,21 +40,11 @@
       <% end %>
     </tbody>
   </table>
-  <div id='query'>
-    <a href="/">All</a>
-    <a href="/batters">Batters</a>
-    <a href="/pitchers">Pitchers</a><br />
-    <form action="/" method="get">
-      Position: <input type="text" name="position" /><br />
-      Limit: <input type="text" name="limit" /><br />
-      Hide Drafted: <input type="checkbox" name="hide-drafted" /><br />
-      <input type="submit" value="Search" />
-    </form>
-  </div>
+  <%= erb :_search_box %>
 </body>
 <foot>
   <script language="javascript" type="text/javascript" src="/javascripts/jquery-1.7.1.min.js" ></script>
-  <script language="javascript" type="text/javascript" src="/javascripts/colorize.js" ></script>
+  <script language="javascript" type="text/javascript" src="/javascripts/jquery-tablesorter.min.js" ></script>
   <script language="javascript" type="text/javascript" src="/javascripts/jquery.heatcolor.0.0.1.pack.js" ></script>
   <script>
     $(document).ready(function() { 

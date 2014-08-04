@@ -1,6 +1,23 @@
 require 'rubygems'
 require 'sequel'
 require 'csv'
+require 'mechanize'
+
+YAHOO_FREE_AGENT_URL = "http://baseball.fantasysports.yahoo.com/b1/82596/players"
+YAHOO_LOGIN_URL = "http://login.yahoo.com/config/login"
+FANGRAPHS_PROJECTIONS_URL = "http://www.fangraphs.com/projections.aspx?type=steamerr&team=0&players=0"
+BASEBALL_REFERENCE_ROOKIES_URL = "http://www.baseball-reference.com/leagues/MLB/2014-rookies.shtml"
+BATTING_CATEGORIES = %w[r hr rbi sb avg obp]
+PITCHING_CATEGORIES = %w[so sv era war h_per_nine bb_per_nine]
+INVERSE_CATEGORIES = %w[era h_per_nine bb_per_nine]
+BATTER_POSITIONS = %w[c 1b 2b 3b ss of dh]
+
+@agent = Mechanize.new
+@agent.get(YAHOO_FREE_AGENT_URL) # set referrer
+login = @agent.get(YAHOO_LOGIN_URL).forms.first
+login.username = ARGV[0]
+login.passwd = ARGV[1]
+login.submit
 
 DB = Sequel.sqlite('baseball.sqlite')
 
@@ -19,8 +36,8 @@ DB.create_table :players do
   Decimal :avg
   Decimal :obp
   Decimal :w
-  Decimal :k
-  Decimal :s
+  Decimal :so
+  Decimal :sv
   Decimal :era
   Decimal :qs
   Decimal :h_per_nine
@@ -34,63 +51,97 @@ DB.create_table :players do
   TrueClass :injury, :default => false
   TrueClass :favorite, :default => false
   TrueClass :prospect, :default => false
+  TrueClass :rookie, :default => false
 end
 
 DB.add_index :players, :id
 @players_table = DB[:players]
 
-puts "calculating stats"
-def std_dev values
-  count = values.size
-  mean = values.inject(:+) / count.to_f
-  Math.sqrt( values.inject(0) { |sum, e| sum + (e - mean) ** 2 } / count.to_f )
-end
-
-def parse_csv file, type
+def parse_csv csv, position
   players = {}
-  CSV.open(file, {:headers => true, :header_converters => :downcase}).each do |row|
-    categories = type == :batter ?
-      ['r', 'hr', 'rbi', 'sb', 'avg', 'obp'] : 
-      ['k', 's', 'era', 'war']
-    players[row['name']] = {'type' => type.to_s, 'value' => 0}
-    categories.each{|c| players[row['name']][c] = row[c].to_f}
-    if type == :pitcher
-      players[row['name']]['h_per_nine'] = (row['h'].to_f * 9) / row['ip'].to_f
-      players[row['name']]['bb_per_nine'] = (row['bb'].to_f * 9) / row['ip'].to_f
-      ['era', 'h_per_nine', 'bb_per_nine'].each {|p| players[row['name']][p] *= -1 }
-    end
+  CSV.parse(csv, {:headers => true, :header_converters => :downcase}).each do |row|
+    player = {'value' => 0, 'position' => position.upcase}
+    categories = if position == 'p'
+                   player['h_per_nine'] = (row['h'].to_f * 9) / row['ip'].to_f
+                   player['bb_per_nine'] = (row['bb'].to_f * 9) / row['ip'].to_f
+                   PITCHING_CATEGORIES
+                 else
+                   BATTING_CATEGORIES
+                 end
+    categories.each{|c| player[c] = row[c].to_f if row[c]}
+    INVERSE_CATEGORIES.each {|i| player[i] *= -1 if player[i]}
+    players[row['name']] = player
   end
   players
+end
+
+def get_projections position
+  url = FANGRAPHS_PROJECTIONS_URL + (position == 'p' ? "&stats=pit&pos=all" : "&stats=bat&pos=#{position}")
+  projections = @agent.get(url)
+  form = projections.forms.first
+  form['__EVENTTARGET'] = 'ProjectionBoard1$cmdCSV'
+  form['__EVENTARGUMENT'] = ''
+  parse_csv form.submit.body[3..-1], position
+end
+
+def avg values
+  values.inject(:+) / values.size.to_f
+end
+
+def std_dev values
+  mean = avg values
+  Math.sqrt( values.inject(0){ |sum, e| sum + (e - mean) ** 2 } / values.size.to_f )
 end
 
 def calculate players, stat
   vals = players.values.collect{|pl| pl[stat]}
   if vals.select{|v| v == 0.0} == vals
-    puts("WARNING: No values found in csv file for #{stat}")
+    puts("WARNING: No values found in csv for #{stat}")
     return
   end
   stddev = std_dev vals
-  mean = vals.inject(:+) / vals.size.to_f
+  mean = avg vals
   players.each do |k,v| 
     v["#{stat}_val"] = ((v[stat] - mean) / stddev)
     v['value'] += v["#{stat}_val"]
   end
 end
 
-batters = parse_csv 'data/batters_mid.csv', :batter
-['r', 'hr', 'rbi', 'sb', 'avg', 'obp'] .each do |stat|
-  calculate batters, stat
+def get_free_agents type
+  url = YAHOO_FREE_AGENT_URL + (type == :pitcher ? "?pos=P" : "")
+  players_page = @agent.get(url)
+  players = players_page.links.select{|l| l.attributes['class'] =~ /name/}.map(&:to_s)
+  10.times do |i|
+    print " #{type.to_s} page #{i + 1}...\r"
+    players_page = players_page.link_with(:text => "Next 25").click
+    players += players_page.links.select{|l| l.attributes['class'] =~ /name/}.map(&:to_s)
+  end
+  players
 end
-pitchers = parse_csv 'data/pitchers_mid.csv', :pitcher
-['k', 's', 'era', 'h_per_nine', 'bb_per_nine', 'war'].each do |stat|
-  calculate pitchers, stat
+
+puts "getting projections"
+batters = {}
+BATTER_POSITIONS.each do |pos|
+  print " #{pos}...\r"
+  get_projections(pos).each do |name, player|
+    existing = batters[name]
+    player['position'] = "#{existing['position']},#{pos.upcase}" if existing && !existing['position'].match(pos.upcase)
+    batters[name] = player
+  end
 end
+print " p...\r"
+pitchers = get_projections 'p'
+
+puts "calculating value"
+BATTING_CATEGORIES.each { |stat| calculate batters, stat }
+PITCHING_CATEGORIES.each { |stat| calculate pitchers, stat }
 
 puts "inserting players"
 batters.merge(pitchers).each do |name, player|
   @players_table.insert(
     :name => name,
     :type => player['type'],
+    :position => player['position'],
     :value => player['value'],
     :r => player['r'],
     :hr => player['hr'],
@@ -98,275 +149,143 @@ batters.merge(pitchers).each do |name, player|
     :sb => player['sb'],
     :avg => player['avg'],
     :obp => player['obp'],
-    :k => player['k'],
-    :s => player['s'],
+    :so => player['so'],
+    :sv => player['sv'],
     :era => player['era'],
     :h_per_nine => player['h_per_nine'],
     :bb_per_nine => player['bb_per_nine'],
-    :war => player['war'])
+    :war => player['war'],
+    :drafted => true)
 end
 
-#puts "updating list of 12"
-#@players_table.filter(:name => 'Sale, Chris').update(:list_of_twelve => true)
-#@players_table.filter(:name => 'Minor, Mike').update(:list_of_twelve => true)
-#@players_table.filter(:name => 'Medlen, Kris').update(:list_of_twelve => true)
-#@players_table.filter(:name => 'Nova, Ivan').update(:list_of_twelve => true)
-#@players_table.filter(:name => 'Morton, Charlie').update(:list_of_twelve => true)
-#@players_table.filter(:name => 'Tillman, Chris').update(:list_of_twelve => true)
-#@players_table.filter(:name => 'Gee, Dillon').update(:list_of_twelve => true)
-#@players_table.filter(:name => 'Wood, Travis').update(:list_of_twelve => true)
-#@players_table.filter(:name => 'Chacin, Jhoulys').update(:list_of_twelve => true)
-#@players_table.filter(:name => 'Garcia, Jaime').update(:list_of_twelve => true)
-#@players_table.filter(:name => 'Hellickson, Jeremy').update(:list_of_twelve => true)
-#@players_table.filter(:name => 'Stauffer, Tim').update(:list_of_twelve => true)
-#@players_table.filter(:name => 'Ohlendorf, Ross').update(:list_of_twelve => true)
-#@players_table.filter(:name => 'McDonald, James').update(:list_of_twelve => true)
-#@players_table.filter(:name => 'Davis, Wade').update(:list_of_twelve => true)
+puts "getting free agents"
+free_agents = get_free_agents(:batter) + get_free_agents(:pitcher)
+free_agents.each { |p| @players_table.filter(:name => p).update(:drafted => false) }
 
-#puts "updating keepers"
-#@players_table.filter(:name => 'Perkins, Glen').update(:drafted => true)
-#@players_table.filter(:name => 'Scherzer, Max').update(:drafted => true)
-#@players_table.filter(:name => 'Fernandez, Jose').update(:drafted => true)
-#@players_table.filter(:name => 'Segura, Jean').update(:drafted => true)
-#@players_table.filter(:name => 'Desmond, Ian').update(:drafted => true)
-#@players_table.filter(:name => 'Pedrioa, Dustin').update(:drafted => true)
-#@players_table.filter(:name => 'Ryu, Hyun-jin').update(:drafted => true)
-#@players_table.filter(:name => 'Uehara, Koju').update(:drafted => true)
-#@players_table.filter(:name => 'Ramirez, Hanley').update(:drafted => true)
-#@players_table.filter(:name => 'Iwakuma, Hisashi').update(:drafted => true)
-#@players_table.filter(:name => 'Jansen, Kenley').update(:drafted => true)
-#@players_table.filter(:name => 'Posey, Buster').update(:drafted => true)
-#@players_table.filter(:name => 'Puig, Yasiel').update(:drafted => true)
-#@players_table.filter(:name => 'Trout, Mike').update(:drafted => true)
-#@players_table.filter(:name => 'Goldschmidt, Paul').update(:drafted => true)
-#@players_table.filter(:name => 'Hamilton, Billy').update(:drafted => true)
-#@players_table.filter(:name => 'Jones, Adam').update(:drafted => true)
-#@players_table.filter(:name => 'Adams, Matt').update(:drafted => true)
-#@players_table.filter(:name => 'Prado, Martín').update(:drafted => true)
-#@players_table.filter(:name => 'Choo, Shin Shoo').update(:drafted => true)
-#@players_table.filter(:name => 'Kipnis, Jason').update(:drafted => true)
-#@players_table.filter(:name => 'Holland, Greg').update(:drafted => true)
-#@players_table.filter(:name => 'Wacha, Michael').update(:drafted => true)
-#@players_table.filter(:name => 'Seager, Kyle').update(:drafted => true)
-#@players_table.filter(:name => 'Davis, Chris').update(:drafted => true)
-#@players_table.filter(:name => 'Simmons, Andrelton').update(:drafted => true)
-#@players_table.filter(:name => 'Machado, Manny').update(:drafted => true)
-#@players_table.filter(:name => 'Brown, Dominic').update(:drafted => true)
-#@players_table.filter(:name => 'Myers, Wil').update(:drafted => true)
-#@players_table.filter(:name => 'Cole, Gerritt').update(:drafted => true)
-#@players_table.filter(:name => 'Rizzo, Anthony').update(:drafted => true)
-#@players_table.filter(:name => 'Werth, Jason').update(:drafted => true)
-#@players_table.filter(:name => 'Harper, Bryce').update(:drafted => true)
-#@players_table.filter(:name => 'Kershaw, Clayton').update(:drafted => true)
-#@players_table.filter(:name => 'Lee, Cliff').update(:drafted => true)
-#@players_table.filter(:name => 'Gordon, Alex').update(:drafted => true)
-#@players_table.filter(:name => 'Gomez, Carlos').update(:drafted => true)
-#@players_table.filter(:name => 'Craig, Allen').update(:drafted => true)
-#@players_table.filter(:name => 'Gray, Sonny').update(:drafted => true)
-#@players_table.filter(:name => 'Alvarez, Pedro').update(:drafted => true)
-#@players_table.filter(:name => 'Encarnacion, Edwin').update(:drafted => true)
-#@players_table.filter(:name => 'Donaldson, Josh').update(:drafted => true)
-#@players_table.filter(:name => 'Darvish, Yu').update(:drafted => true)
-#@players_table.filter(:name => 'Cabrera, Evereth').update(:drafted => true)
-#@players_table.filter(:name => 'Sale, Chris').update(:drafted => true)
-#@players_table.filter(:name => 'Carpenter, Matt').update(:drafted => true)
-#@players_table.filter(:name => 'Cobb, Alex').update(:drafted => true)
-#@players_table.filter(:name => 'Holliday, Matt').update(:drafted => true)
+puts "updating rookies"
+rookies = @agent.get(BASEBALL_REFERENCE_ROOKIES_URL)
+rookies.at('table#misc_batting').css('tbody tr').each do |rookie|
+  @players_table.filter(:name => rookie.css('td')[1].text).update(:rookie => true)
+end
+rookies.at('table#misc_pitching').css('tbody tr').each do |rookie|
+  @players_table.filter(:name => rookie.css('td')[1].text).update(:rookie => true)
+end
 
-#puts "updating injured players"
-#@players_table.filter(:name => "Burnett, Sean").update(:injury => true)
-#@players_table.filter(:name => "De La Rosa, Dane").update(:injury => true)
-#@players_table.filter(:name => "Moran, Brian").update(:injury => true)
-#@players_table.filter(:name => "Crain, Jesse").update(:injury => true)
-#@players_table.filter(:name => "White, Alex").update(:injury => true)
-#@players_table.filter(:name => "Cook, Ryan").update(:injury => true)
-#@players_table.filter(:name => "Gentry, Craig").update(:injury => true)
-#@players_table.filter(:name => "Griffin, A.J.").update(:injury => true)
-#@players_table.filter(:name => "O'Flaherty, Eric").update(:injury => true)
-#@players_table.filter(:name => "Parker, Jarrod").update(:injury => true)
-#@players_table.filter(:name => "Happ, J.A.").update(:injury => true)
-#@players_table.filter(:name => "Reyes, Jose").update(:injury => true)
-#@players_table.filter(:name => "Beachy, Brandon").update(:injury => true)
-#@players_table.filter(:name => "Floyd, Gavin").update(:injury => true)
-#@players_table.filter(:name => "Medlen, Kris").update(:injury => true)
-#@players_table.filter(:name => "Minor, Mike").update(:injury => true)
-#@players_table.filter(:name => "Venters, Jonny").update(:injury => true)
-#@players_table.filter(:name => "Gorzelanny, Tom").update(:injury => true)
-#@players_table.filter(:name => "Segura, Jean").update(:injury => true)
-#@players_table.filter(:name => "Garcia, Jaime").update(:injury => true)
-#@players_table.filter(:name => "Motte, Jason").update(:injury => true)
-#@players_table.filter(:name => "Arrieta, Jake").update(:injury => true)
-#@players_table.filter(:name => "Fujikawa, Kyuji").update(:injury => true)
-#@players_table.filter(:name => "McDonald, James").update(:injury => true)
-#@players_table.filter(:name => "Arroyo, Bronson").update(:injury => true)
-#@players_table.filter(:name => "Corbin, Patrick").update(:injury => true)
-#@players_table.filter(:name => "Hernandez, David").update(:injury => true)
-#@players_table.filter(:name => "Reynolds, Matt").update(:injury => true)
-#@players_table.filter(:name => "Ross, Cody").update(:injury => true)
-#@players_table.filter(:name => "Beckett, Josh").update(:injury => true)
-#@players_table.filter(:name => "Billingsley, Chad").update(:injury => true)
-#@players_table.filter(:name => "Elbert, Scott").update(:injury => true)
-#@players_table.filter(:name => "Garcia, Onelki").update(:injury => true)
-#@players_table.filter(:name => "Greinke, Zack").update(:injury => true)
-#@players_table.filter(:name => "Kemp, Matt").update(:injury => true)
-#@players_table.filter(:name => "Kershaw, Clayton").update(:injury => true)
-#@players_table.filter(:name => "Puig, Yasiel").update(:injury => true)
-#@players_table.filter(:name => "Scutaro, Marco").update(:injury => true)
-#@players_table.filter(:name => "Bourn, Michael").update(:injury => true)
-#@players_table.filter(:name => "Iwakuma, Hisashi").update(:injury => true)
-#@players_table.filter(:name => "Pryor, Stephen").update(:injury => true)
-#@players_table.filter(:name => "Walker, Taijuan").update(:injury => true)
-#@players_table.filter(:name => "Furcal, Rafael").update(:injury => true)
-#@players_table.filter(:name => "Lucas, Ed").update(:injury => true)
-#@players_table.filter(:name => "Harvey, Matt").update(:injury => true)
-#@players_table.filter(:name => "Niese, Jonathon").update(:injury => true)
-#@players_table.filter(:name => "Davis, Erik").update(:injury => true)
-#@players_table.filter(:name => "Fister, Doug").update(:injury => true)
-#@players_table.filter(:name => "Mattheus, Ryan").update(:injury => true)
-#@players_table.filter(:name => "Ohlendorf, Ross").update(:injury => true)
-#@players_table.filter(:name => "Machado, Manny").update(:injury => true)
-#@players_table.filter(:name => "Peguero, Francisco").update(:injury => true)
-#@players_table.filter(:name => "Reimold, Nolan").update(:injury => true)
-#@players_table.filter(:name => "Johnson, Josh").update(:injury => true)
-#@players_table.filter(:name => "Kelly, Casey").update(:injury => true)
-#@players_table.filter(:name => "Luebke, Cory").update(:injury => true)
-#@players_table.filter(:name => "Maybin, Cameron").update(:injury => true)
-#@players_table.filter(:name => "Wieland, Joseph").update(:injury => true)
-#@players_table.filter(:name => "Adams, Mike").update(:injury => true)
-#@players_table.filter(:name => "Galvis, Freddy").update(:injury => true)
-#@players_table.filter(:name => "Gonzalez, Miguel").update(:injury => true)
-#@players_table.filter(:name => "Hamels, Cole").update(:injury => true)
-#@players_table.filter(:name => "Martin, Ethan").update(:injury => true)
-#@players_table.filter(:name => "Pettibone, Jonathan").update(:injury => true)
-#@players_table.filter(:name => "Ruf, Darin").update(:injury => true)
-#@players_table.filter(:name => "Stewart, Chris").update(:injury => true)
-#@players_table.filter(:name => "Beltre, Engel").update(:injury => true)
-#@players_table.filter(:name => "Darvish, Yu").update(:injury => true)
-#@players_table.filter(:name => "Harrison, Matt").update(:injury => true)
-#@players_table.filter(:name => "Holland, Derek").update(:injury => true)
-#@players_table.filter(:name => "Ortiz, Joseph").update(:injury => true)
-#@players_table.filter(:name => "Profar, Jurickson").update(:injury => true)
-#@players_table.filter(:name => "Soto, Geovany").update(:injury => true)
-#@players_table.filter(:name => "Hellickson, Jeremy").update(:injury => true)
-#@players_table.filter(:name => "Breslow, Craig").update(:injury => true)
-#@players_table.filter(:name => "Wright, Steven").update(:injury => true)
-#@players_table.filter(:name => "Broxton, Jonathan").update(:injury => true)
-#@players_table.filter(:name => "Chapman, Aroldis").update(:injury => true)
-#@players_table.filter(:name => "Hannahan, Jack").update(:injury => true)
-#@players_table.filter(:name => "Latos, Mat").update(:injury => true)
-#@players_table.filter(:name => "Marshall, Sean").update(:injury => true)
-#@players_table.filter(:name => "Mesoraco, Devin").update(:injury => true)
-#@players_table.filter(:name => "Schumaker, Skip").update(:injury => true)
-#@players_table.filter(:name => "Chacin, Jhoulys").update(:injury => true)
-#@players_table.filter(:name => "Logan, Boone").update(:injury => true)
-#@players_table.filter(:name => "Hochevar, Luke").update(:injury => true)
-#@players_table.filter(:name => "Infante, Omar").update(:injury => true)
-#@players_table.filter(:name => "Dirks, Andy").update(:injury => true)
-#@players_table.filter(:name => "Iglesias, Jose").update(:injury => true)
-#@players_table.filter(:name => "Rondon, Bruce").update(:injury => true)
-#@players_table.filter(:name => "Florimon, Pedro").update(:injury => true)
-#@players_table.filter(:name => "Beckham, Gordon").update(:injury => true)
-#@players_table.filter(:name => "Keppinger, Jeff").update(:injury => true)
-#@players_table.filter(:name => "Ryan, Brendan").update(:injury => true)
+puts "updating list of 12"
+@players_table.filter(:name => 'Chris, Sale').update(:list_of_twelve => true)
+@players_table.filter(:name => 'Mike Minor').update(:list_of_twelve => true)
+@players_table.filter(:name => 'Kris Medlen').update(:list_of_twelve => true)
+@players_table.filter(:name => 'Ivan Nova').update(:list_of_twelve => true)
+@players_table.filter(:name => 'Charlie Morton').update(:list_of_twelve => true)
+@players_table.filter(:name => 'Chris Tillman').update(:list_of_twelve => true)
+@players_table.filter(:name => 'Dillon Gee').update(:list_of_twelve => true)
+@players_table.filter(:name => 'Travis Wood').update(:list_of_twelve => true)
+@players_table.filter(:name => 'Jhoulys Chacin').update(:list_of_twelve => true)
+@players_table.filter(:name => 'Jaime Garcia').update(:list_of_twelve => true)
+@players_table.filter(:name => 'Jeremy Hellickson').update(:list_of_twelve => true)
+@players_table.filter(:name => 'Tim Stauffer').update(:list_of_twelve => true)
+@players_table.filter(:name => 'Ross Ohlendorf').update(:list_of_twelve => true)
+@players_table.filter(:name => 'James McDonald').update(:list_of_twelve => true)
+@players_table.filter(:name => 'Wade Davis').update(:list_of_twelve => true)
 
-#puts "updating prospects"
-#@players_table.filter(:name => "Buxton, Byron").update(:prospect => true)
-#@players_table.filter(:name => "Bogaerts, Xander").update(:prospect => true)
-#@players_table.filter(:name => "Taveras, Oscar").update(:prospect => true)
-#@players_table.filter(:name => "Sano, Miguel").update(:prospect => true)
-#@players_table.filter(:name => "Bradley, Archie").update(:prospect => true)
-#@players_table.filter(:name => "Walker, Taijuan").update(:prospect => true)
-#@players_table.filter(:name => "Baez, Javier").update(:prospect => true)
-#@players_table.filter(:name => "Correa, Carlos").update(:prospect => true)
-#@players_table.filter(:name => "Bryant, Kris").update(:prospect => true)
-#@players_table.filter(:name => "Lindor, Francisco").update(:prospect => true)
-#@players_table.filter(:name => "Syndergaard, Noah").update(:prospect => true)
-#@players_table.filter(:name => "Russell, Addison").update(:prospect => true)
-#@players_table.filter(:name => "Polanco, Gregory").update(:prospect => true)
-#@players_table.filter(:name => "Gray, Jonathan").update(:prospect => true)
-#@players_table.filter(:name => "Castellanos, Nick").update(:prospect => true)
-#@players_table.filter(:name => "Taillon, Jameson").update(:prospect => true)
-#@players_table.filter(:name => "Appel, Mark").update(:prospect => true)
-#@players_table.filter(:name => "Almora, Albert").update(:prospect => true)
-#@players_table.filter(:name => "Stephenson, Robert").update(:prospect => true)
-#@players_table.filter(:name => "Bundy, Dylan").update(:prospect => true)
-#@players_table.filter(:name => "Springer, George").update(:prospect => true)
-#@players_table.filter(:name => "d'Arnaud, Travis").update(:prospect => true)
-#@players_table.filter(:name => "Sanchez, Aaron").update(:prospect => true)
-#@players_table.filter(:name => "Hedges, Austin").update(:prospect => true)
-#@players_table.filter(:name => "Zimmer, Kyle").update(:prospect => true)
-#@players_table.filter(:name => "Franco, Maikel").update(:prospect => true)
-#@players_table.filter(:name => "Glasnow, Tyler").update(:prospect => true)
-#@players_table.filter(:name => "Meyer, Alex").update(:prospect => true)
-#@players_table.filter(:name => "Heaney, Andrew").update(:prospect => true)
-#@players_table.filter(:name => "Owens, Henry").update(:prospect => true)
-#@players_table.filter(:name => "Gausman, Kevin").update(:prospect => true)
-#@players_table.filter(:name => "Crick, Kyle").update(:prospect => true)
-#@players_table.filter(:name => "Bradley, Jackie").update(:prospect => true)
-#@players_table.filter(:name => "Seager, Corey").update(:prospect => true)
-#@players_table.filter(:name => "Ventura, Yordano").update(:prospect => true)
-#@players_table.filter(:name => "Pederson, Joc").update(:prospect => true)
-#@players_table.filter(:name => "Hamilton, Billy").update(:prospect => true)
-#@players_table.filter(:name => "Adalberto Mondesi, Raul").update(:prospect => true)
-#@players_table.filter(:name => "Alfaro, Jorge").update(:prospect => true)
-#@players_table.filter(:name => "Stewart, Kohl").update(:prospect => true)
-#@players_table.filter(:name => "Butler, Eddie").update(:prospect => true)
-#@players_table.filter(:name => "Edwards, C.J.").update(:prospect => true)
-#@players_table.filter(:name => "Fried, Max").update(:prospect => true)
-#@players_table.filter(:name => "Giolito, Lucas").update(:prospect => true)
-#@players_table.filter(:name => "Meadows, Austin").update(:prospect => true)
-#@players_table.filter(:name => "Webster, Allen").update(:prospect => true)
-#@players_table.filter(:name => "Sanchez, Gary").update(:prospect => true)
-#@players_table.filter(:name => "Frazier, Clint").update(:prospect => true)
-#@players_table.filter(:name => "Soler, Jorge").update(:prospect => true)
-#@players_table.filter(:name => "Singleton, Jonathan").update(:prospect => true)
-#@players_table.filter(:name => "Moran, Colin").update(:prospect => true)
-#@players_table.filter(:name => "McCullers Jr., Lance").update(:prospect => true)
-#@players_table.filter(:name => "Biddle, Jesse").update(:prospect => true)
-#@players_table.filter(:name => "Foltyniewicz, Mike").update(:prospect => true)
-#@players_table.filter(:name => "Stroman, Marcus").update(:prospect => true)
-#@players_table.filter(:name => "Odorizzi, Jake").update(:prospect => true)
-#@players_table.filter(:name => "Cecchini, Garin").update(:prospect => true)
-#@players_table.filter(:name => "Wong, Kolten").update(:prospect => true)
-#@players_table.filter(:name => "Odor, Rougned").update(:prospect => true)
-#@players_table.filter(:name => "Sims, Lucas").update(:prospect => true)
-#@players_table.filter(:name => "Swihart, Blake").update(:prospect => true)
-#@players_table.filter(:name => "Betts, Mookie").update(:prospect => true)
-#@players_table.filter(:name => "Lee, Zach").update(:prospect => true)
-#@players_table.filter(:name => "Urias, Julio").update(:prospect => true)
-#@players_table.filter(:name => "Marisnick, Jake").update(:prospect => true)
-#@players_table.filter(:name => "DeShields Jr., Delino").update(:prospect => true)
-#@players_table.filter(:name => "Hanson, Alen").update(:prospect => true)
-#@players_table.filter(:name => "Rodriguez, Eduardo").update(:prospect => true)
-#@players_table.filter(:name => "Cole, A.J.").update(:prospect => true)
-#@players_table.filter(:name => "Johnson, Erik").update(:prospect => true)
-#@players_table.filter(:name => "Dahl, David").update(:prospect => true)
-#@players_table.filter(:name => "Choice, Michael").update(:prospect => true)
-#@players_table.filter(:name => "Bauer, Trevor").update(:prospect => true)
-#@players_table.filter(:name => "Bell, Josh").update(:prospect => true)
-#@players_table.filter(:name => "Williams, Mason").update(:prospect => true)
-#@players_table.filter(:name => "Sardinas, Luis").update(:prospect => true)
-#@players_table.filter(:name => "Owings, Chris").update(:prospect => true)
-#@players_table.filter(:name => "Wisler, Matt").update(:prospect => true)
-#@players_table.filter(:name => "Shipley, Braden").update(:prospect => true)
-#@players_table.filter(:name => "Davidson, Matt").update(:prospect => true)
-#@players_table.filter(:name => "Nicolino, Justin").update(:prospect => true)
-#@players_table.filter(:name => "Bethancourt, Christian").update(:prospect => true)
-#@players_table.filter(:name => "Nelson, Jimmy").update(:prospect => true)
-#@players_table.filter(:name => "Hak-Lee, Ju").update(:prospect => true)
-#@players_table.filter(:name => "Montero, Rafael").update(:prospect => true)
-#@players_table.filter(:name => "Barnes, Matt").update(:prospect => true)
-#@players_table.filter(:name => "Kelly, Casey").update(:prospect => true)
-#@players_table.filter(:name => "Peterson, D.J.").update(:prospect => true)
-#@players_table.filter(:name => "Alcantara, Arismendy").update(:prospect => true)
-#@players_table.filter(:name => "Berrios, J.O.").update(:prospect => true)
-#@players_table.filter(:name => "Bonifacio, Jorge").update(:prospect => true)
-#@players_table.filter(:name => "Gallo, Joey").update(:prospect => true)
-#@players_table.filter(:name => "Osuna, Roberto").update(:prospect => true)
-#@players_table.filter(:name => "Guerrieri, Taylor").update(:prospect => true)
-#@players_table.filter(:name => "Escobar, Edwin").update(:prospect => true)
-#@players_table.filter(:name => "Ball, Trey").update(:prospect => true)
-#@players_table.filter(:name => "Ray, Robbie").update(:prospect => true)
-#@players_table.filter(:name => "Piscotty, Stephen").update(:prospect => true)
-#@players_table.filter(:name => "Herrera, Rosell").update(:prospect => true)
-#@players_table.filter(:name => "Johnson, Pierce").update(:prospect => true)
+puts "updating prospects"
+@players_table.filter(:name => "Byron Buxton").update(:prospect => true)
+@players_table.filter(:name => "Xander Bogaerts").update(:prospect => true)
+@players_table.filter(:name => "Oscar Taveras").update(:prospect => true)
+@players_table.filter(:name => "Miguel Sano").update(:prospect => true)
+@players_table.filter(:name => "Archie Bradley").update(:prospect => true)
+@players_table.filter(:name => "Taijuan Walker").update(:prospect => true)
+@players_table.filter(:name => "Javier Baez").update(:prospect => true)
+@players_table.filter(:name => "Carlos Correa").update(:prospect => true)
+@players_table.filter(:name => "Kris Bryant").update(:prospect => true)
+@players_table.filter(:name => "Francisco Lindor").update(:prospect => true)
+@players_table.filter(:name => "Noah Syndergaard").update(:prospect => true)
+@players_table.filter(:name => "Addison Russell").update(:prospect => true)
+@players_table.filter(:name => "Gregory Polanco").update(:prospect => true)
+@players_table.filter(:name => "Jonathan Gray").update(:prospect => true)
+@players_table.filter(:name => "Nick Castellanos").update(:prospect => true)
+@players_table.filter(:name => "Jameson Taillon").update(:prospect => true)
+@players_table.filter(:name => "Mark Appel").update(:prospect => true)
+@players_table.filter(:name => "Albert Almora").update(:prospect => true)
+@players_table.filter(:name => "Robert Stephenson").update(:prospect => true)
+@players_table.filter(:name => "Dylan Bundy").update(:prospect => true)
+@players_table.filter(:name => "George Springer").update(:prospect => true)
+@players_table.filter(:name => "Travis d'Arnaud").update(:prospect => true)
+@players_table.filter(:name => "Aaron Sanchez").update(:prospect => true)
+@players_table.filter(:name => "Austin Hedges").update(:prospect => true)
+@players_table.filter(:name => "Kyle Zimmer").update(:prospect => true)
+@players_table.filter(:name => "Maikel Franco").update(:prospect => true)
+@players_table.filter(:name => "Tyler Glasnow").update(:prospect => true)
+@players_table.filter(:name => "Alex Meyer").update(:prospect => true)
+@players_table.filter(:name => "Andrew Heaney").update(:prospect => true)
+@players_table.filter(:name => "Henry Owens").update(:prospect => true)
+@players_table.filter(:name => "Kevin Gausman").update(:prospect => true)
+@players_table.filter(:name => "Kyle Crick").update(:prospect => true)
+@players_table.filter(:name => "Jackie Bradley").update(:prospect => true)
+@players_table.filter(:name => "Corey Seager").update(:prospect => true)
+@players_table.filter(:name => "Yordano Ventura").update(:prospect => true)
+@players_table.filter(:name => "Joc Pederson").update(:prospect => true)
+@players_table.filter(:name => "Billy Hamilton").update(:prospect => true)
+@players_table.filter(:name => "Raul Adalberto Mondesi").update(:prospect => true)
+@players_table.filter(:name => "Jorge Alfaro").update(:prospect => true)
+@players_table.filter(:name => "Kohl Stewart").update(:prospect => true)
+@players_table.filter(:name => "Eddie Butler").update(:prospect => true)
+@players_table.filter(:name => "C.J. Edwards").update(:prospect => true)
+@players_table.filter(:name => "Max Fried").update(:prospect => true)
+@players_table.filter(:name => "Lucas Giolito").update(:prospect => true)
+@players_table.filter(:name => "Austin Meadows").update(:prospect => true)
+@players_table.filter(:name => "Allen Webster").update(:prospect => true)
+@players_table.filter(:name => "Gary Sanchez").update(:prospect => true)
+@players_table.filter(:name => "Clint Frazier").update(:prospect => true)
+@players_table.filter(:name => "Jorge Soler").update(:prospect => true)
+@players_table.filter(:name => "Jonathan Singleton").update(:prospect => true)
+@players_table.filter(:name => "Colin Moran").update(:prospect => true)
+@players_table.filter(:name => "Lance McCullers Jr.").update(:prospect => true)
+@players_table.filter(:name => "Jesse Biddle").update(:prospect => true)
+@players_table.filter(:name => "Mike Foltyniewicz").update(:prospect => true)
+@players_table.filter(:name => "Marcus Stroman").update(:prospect => true)
+@players_table.filter(:name => "Jake Odorizzi").update(:prospect => true)
+@players_table.filter(:name => "Garin Cecchini").update(:prospect => true)
+@players_table.filter(:name => "Kolten Wong").update(:prospect => true)
+@players_table.filter(:name => "Rougned Odor").update(:prospect => true)
+@players_table.filter(:name => "Lucas Sims").update(:prospect => true)
+@players_table.filter(:name => "Blake Swihart").update(:prospect => true)
+@players_table.filter(:name => "Mookie Betts").update(:prospect => true)
+@players_table.filter(:name => "Zach Lee").update(:prospect => true)
+@players_table.filter(:name => "Julio Urias").update(:prospect => true)
+@players_table.filter(:name => "Jake Marisnick").update(:prospect => true)
+@players_table.filter(:name => "Delino DeShields Jr.").update(:prospect => true)
+@players_table.filter(:name => "Alen Hanson").update(:prospect => true)
+@players_table.filter(:name => "Eduardo Rodriguez").update(:prospect => true)
+@players_table.filter(:name => "A.J. Cole").update(:prospect => true)
+@players_table.filter(:name => "Erik Johnson").update(:prospect => true)
+@players_table.filter(:name => "David Dahl").update(:prospect => true)
+@players_table.filter(:name => "Michael Choice").update(:prospect => true)
+@players_table.filter(:name => "Trevor Bauer").update(:prospect => true)
+@players_table.filter(:name => "Josh Bell").update(:prospect => true)
+@players_table.filter(:name => "Mason Williams").update(:prospect => true)
+@players_table.filter(:name => "Luis Sardinas").update(:prospect => true)
+@players_table.filter(:name => "Chris Owings").update(:prospect => true)
+@players_table.filter(:name => "Matt Wisler").update(:prospect => true)
+@players_table.filter(:name => "Braden Shipley").update(:prospect => true)
+@players_table.filter(:name => "Matt Davidson").update(:prospect => true)
+@players_table.filter(:name => "Justin Nicolino").update(:prospect => true)
+@players_table.filter(:name => "Christian Bethancourt").update(:prospect => true)
+@players_table.filter(:name => "Jimmy Nelson").update(:prospect => true)
+@players_table.filter(:name => "Ju Hak-Lee").update(:prospect => true)
+@players_table.filter(:name => "Rafael Montero").update(:prospect => true)
+@players_table.filter(:name => "Matt Barnes").update(:prospect => true)
+@players_table.filter(:name => "Casey Kelly").update(:prospect => true)
+@players_table.filter(:name => "D.J. Peterson").update(:prospect => true)
+@players_table.filter(:name => "Arismendy Alcantara").update(:prospect => true)
+@players_table.filter(:name => "J.O. Berrios").update(:prospect => true)
+@players_table.filter(:name => "Jorge Bonifacio").update(:prospect => true)
+@players_table.filter(:name => "Joey Gallo").update(:prospect => true)
+@players_table.filter(:name => "Roberto Osuna").update(:prospect => true)
+@players_table.filter(:name => "Taylor Guerrieri").update(:prospect => true)
+@players_table.filter(:name => "Edwin Escobar").update(:prospect => true)
+@players_table.filter(:name => "Trey Ball").update(:prospect => true)
+@players_table.filter(:name => "Robbie Ray").update(:prospect => true)
+@players_table.filter(:name => "Stephen Piscotty").update(:prospect => true)
+@players_table.filter(:name => "Rosell Herrera").update(:prospect => true)
+@players_table.filter(:name => "Pierce Johnson").update(:prospect => true)

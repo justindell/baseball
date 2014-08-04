@@ -11,8 +11,8 @@
       <th>Team</th>
       <th>Position</th>
       <th>Value</th>
-      <th>K</th>
-      <th>S</th>
+      <th>SO</th>
+      <th>SV</th>
       <th>ERA</th>
       <th>H/9</th>
       <th>BB/9</th>
@@ -27,14 +27,15 @@
             <% if player[:list_of_twelve] %><img height=16px width=16px src="css/twelve.jpg" /><% end %>
             <% if player[:injury] %><img height=16px width=16px src="css/injury.png" /><% end %>
             <% if player[:prospect] %><img height=16px width=16px src="css/fire.png" /><% end %>
+            <% if player[:rookie] %><img height=16px width=16px src="css/diamond.png" /><% end %>
             <% if player[:favorite] %><img height=16px width=16px src="css/star.png" /><% end %>
             <%= "#{idx + 1}. #{player[:name]}" %>
           </td>
           <td><%= player[:team] %></td>
           <td><%= player[:position] %></td>
           <td><%= sprintf("%0.3f", player[:value]) %></td>
-          <td><%= sprintf("%d", player[:k]) %></td>
-          <td><%= sprintf("%d", player[:s]) %></td>
+          <td><%= sprintf("%d", player[:so]) %></td>
+          <td><%= sprintf("%d", player[:sv]) %></td>
           <td><%= sprintf("%0.3f", player[:era]) %></td>
           <td><%= sprintf("%0.3f", player[:h_per_nine]) %></td>
           <td><%= sprintf("%0.3f", player[:bb_per_nine]) %></td>
@@ -52,17 +53,7 @@
       <% end %>
     </tbody>
   </table>
-  <div id='query'>
-    <a href="/">All</a>
-    <a href="/batters">Batters</a>
-    <a href="/pitchers">Pitchers</a><br />
-    <form action="/pitchers" method="get">
-      Limit: <input type="text" name="limit" /><br />
-      Position: <input type="text" name="position" /><br />
-      Hide Drafted: <input type="checkbox" name="hide-drafted" /><br />
-      <input type="submit" value="Search" />
-    </form>
-  </div>
+  <%= erb :_search_box %>
 </body>
 <foot>
   <script language="javascript" type="text/javascript" src="/javascripts/jquery-1.7.1.min.js" ></script>
