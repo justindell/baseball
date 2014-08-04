@@ -8,9 +8,11 @@ YAHOO_LOGIN_URL = "http://login.yahoo.com/config/login"
 FANGRAPHS_PROJECTIONS_URL = "http://www.fangraphs.com/projections.aspx?type=steamerr&team=0&players=0"
 BASEBALL_REFERENCE_ROOKIES_URL = "http://www.baseball-reference.com/leagues/MLB/2014-rookies.shtml"
 BATTING_CATEGORIES = %w[r hr rbi sb avg obp]
-PITCHING_CATEGORIES = %w[so sv era war h_per_nine bb_per_nine]
+PITCHING_CATEGORIES = %w[so sv era qs h_per_nine bb_per_nine]
 INVERSE_CATEGORIES = %w[era h_per_nine bb_per_nine]
 BATTER_POSITIONS = %w[c 1b 2b 3b ss of dh]
+
+(puts "yahoo username and password required"; exit(1)) unless ARGV[0] && ARGV[1]
 
 @agent = Mechanize.new
 @agent.get(YAHOO_FREE_AGENT_URL) # set referrer
@@ -42,7 +44,6 @@ DB.create_table :players do
   Decimal :qs
   Decimal :h_per_nine
   Decimal :bb_per_nine
-  Decimal :war
   Decimal :value
   Decimal :yahoo_value, :default => 0
   TrueClass :drafted, :default => false
@@ -57,6 +58,21 @@ end
 DB.add_index :players, :id
 @players_table = DB[:players]
 
+def avg values
+  values.inject(:+) / values.size.to_f
+end
+
+def std_dev values
+  mean = avg values
+  Math.sqrt( values.inject(0){ |sum, e| sum + (e - mean) ** 2 } / values.size.to_f )
+end
+
+def quality_starts row
+  #http://www.mrcheatsheet.com/2012/03/classic-expected-quality-starts-formula.html
+  return 0.0 if row['gs'].to_f == 0.0
+  (((row['ip'].to_f / row['gs'].to_f) / 6.15) - (0.11 * row['era'].to_f)) * row['gs'].to_f
+end
+
 def parse_csv csv, position
   players = {}
   CSV.parse(csv, {:headers => true, :header_converters => :downcase}).each do |row|
@@ -64,6 +80,7 @@ def parse_csv csv, position
     categories = if position == 'p'
                    player['h_per_nine'] = (row['h'].to_f * 9) / row['ip'].to_f
                    player['bb_per_nine'] = (row['bb'].to_f * 9) / row['ip'].to_f
+                   player['qs'] = quality_starts(row)
                    PITCHING_CATEGORIES
                  else
                    BATTING_CATEGORIES
@@ -82,15 +99,6 @@ def get_projections position
   form['__EVENTTARGET'] = 'ProjectionBoard1$cmdCSV'
   form['__EVENTARGUMENT'] = ''
   parse_csv form.submit.body[3..-1], position
-end
-
-def avg values
-  values.inject(:+) / values.size.to_f
-end
-
-def std_dev values
-  mean = avg values
-  Math.sqrt( values.inject(0){ |sum, e| sum + (e - mean) ** 2 } / values.size.to_f )
 end
 
 def calculate players, stat
@@ -154,7 +162,7 @@ batters.merge(pitchers).each do |name, player|
     :era => player['era'],
     :h_per_nine => player['h_per_nine'],
     :bb_per_nine => player['bb_per_nine'],
-    :war => player['war'],
+    :qs => player['qs'],
     :drafted => true)
 end
 

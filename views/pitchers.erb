@@ -16,7 +16,7 @@
       <th>ERA</th>
       <th>H/9</th>
       <th>BB/9</th>
-      <th>WAR</th>
+      <th>QS</th>
       <th>Yahoo</th>
       <th></th>
     </thead>
@@ -39,7 +39,7 @@
           <td><%= sprintf("%0.3f", player[:era]) %></td>
           <td><%= sprintf("%0.3f", player[:h_per_nine]) %></td>
           <td><%= sprintf("%0.3f", player[:bb_per_nine]) %></td>
-          <td><%= sprintf("%0.3f", player[:war]) %></td>
+          <td><%= sprintf("%0.3f", player[:qs]) %></td>
           <td>$<%= sprintf("%0d", player[:yahoo_value]) %></td>
           <td>
             <% unless player[:drafted] %>
@@ -53,7 +53,7 @@
       <% end %>
     </tbody>
   </table>
-  <%= erb :_search_box %>
+  <%= erb :_search_box, :locals => {:action => "/pitchers"} %>
 </body>
 <foot>
   <script language="javascript" type="text/javascript" src="/javascripts/jquery-1.7.1.min.js" ></script>

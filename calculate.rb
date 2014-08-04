@@ -22,7 +22,6 @@ class Calculate
 
     def pitchers opts = {}
       query = DB[:players].filter(:position => 'P').order(:value).reverse
-      query = query.filter(:position => opts['position']) if opts['position']
       query = opts['limit'] && !opts['limit'].empty? ? query.limit(opts['limit']) : query.limit(500)
       query = query.filter(:drafted => false) if opts['hide-drafted']
       query.all
