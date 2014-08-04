@@ -103,12 +103,13 @@ end
 
 def calculate players, stat
   vals = players.values.collect{|pl| pl[stat]}
-  if vals.select{|v| v == 0.0} == vals
+  filtered = vals.select{|v| v != 0.0}
+  if filtered.empty?
     puts("WARNING: No values found in csv for #{stat}")
     return
   end
-  stddev = std_dev vals
-  mean = avg vals
+  stddev = std_dev filtered
+  mean = avg filtered
   players.each do |k,v| 
     v["#{stat}_val"] = ((v[stat] - mean) / stddev)
     v['value'] += v["#{stat}_val"]
