@@ -1,22 +1,30 @@
 <html>
   <head>
-    <link rel="stylesheet" type="text/css" href="css/reset.css">
+    <link rel="stylesheet" href="//maxcdn.bootstrapcdn.com/bootstrap/3.2.0/css/bootstrap.min.css">
     <link rel="stylesheet" type="text/css" href="css/style.css">
     <link rel="stylesheet" type="text/css" href="css/main.css">
   </head>
 <body>
-  <table id='players_table' class='tablesorter'>
+  <%= erb :_search_box, :locals => {:action => "/pitchers"} %>
+  <table id='players_table' class='table tablesorter'>
     <thead>
       <th>Player</th>
       <th>Team</th>
       <th>Position</th>
       <th>Value</th>
+      <th>Dollars</th>
       <th>SO</th>
       <th>SV</th>
       <th>ERA</th>
       <th>H/9</th>
       <th>BB/9</th>
       <th>QS</th>
+      <th>zSO</th>
+      <th>zSV</th>
+      <th>zERA</th>
+      <th>zH/9</th>
+      <th>zBB/9</th>
+      <th>zQS</th>
       <th>Yahoo</th>
       <th></th>
     </thead>
@@ -34,12 +42,19 @@
           <td><%= player[:team] %></td>
           <td><%= player[:position] %></td>
           <td><%= sprintf("%0.3f", player[:value]) %></td>
+          <td><%= sprintf("$%0.2f", player[:dollars]) %></td>
           <td><%= sprintf("%d", player[:so]) %></td>
           <td><%= sprintf("%d", player[:sv]) %></td>
           <td><%= sprintf("%0.3f", player[:era]) %></td>
           <td><%= sprintf("%0.3f", player[:h_per_nine]) %></td>
           <td><%= sprintf("%0.3f", player[:bb_per_nine]) %></td>
           <td><%= sprintf("%0.3f", player[:qs]) %></td>
+          <td><%= sprintf("%0.3f", player[:so_val]) %></td>
+          <td><%= sprintf("%0.3f", player[:sv_val]) %></td>
+          <td><%= sprintf("%0.3f", player[:era_val]) %></td>
+          <td><%= sprintf("%0.3f", player[:h_per_nine_val]) %></td>
+          <td><%= sprintf("%0.3f", player[:bb_per_nine_val]) %></td>
+          <td><%= sprintf("%0.3f", player[:qs_val]) %></td>
           <td>$<%= sprintf("%0d", player[:yahoo_value]) %></td>
           <td>
             <% unless player[:drafted] %>
@@ -53,7 +68,6 @@
       <% end %>
     </tbody>
   </table>
-  <%= erb :_search_box, :locals => {:action => "/pitchers"} %>
 </body>
 <foot>
   <script language="javascript" type="text/javascript" src="/javascripts/jquery-1.7.1.min.js" ></script>

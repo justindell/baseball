@@ -1,16 +1,18 @@
 <html>
   <head>
-    <link rel="stylesheet" type="text/css" href="css/reset.css">
+    <link rel="stylesheet" href="//maxcdn.bootstrapcdn.com/bootstrap/3.2.0/css/bootstrap.min.css">
     <link rel="stylesheet" type="text/css" href="css/style.css">
     <link rel="stylesheet" type="text/css" href="css/main.css">
   </head>
 <body>
-  <table id="players_table" class="tablesorter">
+  <%= erb :_search_box, :locals => {:action => "/index"} %>
+  <table id="players_table" class="table tablesorter">
     <thead>
       <th>Player</th>
       <th>Team</th>
       <th>Position</th>
       <th>Value</th>
+      <th>Dollars</th>
       <th>Yahoo</th>
       <th></th>
     </thead>
@@ -27,6 +29,7 @@
           <td><%= player[:team] %></td>
           <td><%= player[:position] %></td>
           <td><%= sprintf("%0.3f", player[:value]) %></td>
+          <td><%= sprintf("$%0.2f", player[:dollars]) %></td>
           <td>$<%= sprintf("%0d", player[:yahoo_value]) %></td>
           <td>
             <% unless player[:drafted] %>
@@ -40,7 +43,6 @@
       <% end %>
     </tbody>
   </table>
-  <%= erb :_search_box, :locals => {:action => "/index"} %>
 </body>
 <foot>
   <script language="javascript" type="text/javascript" src="/javascripts/jquery-1.7.1.min.js" ></script>

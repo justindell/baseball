@@ -1,22 +1,30 @@
 <html>
   <head>
-    <link rel="stylesheet" type="text/css" href="css/reset.css">
+    <link rel="stylesheet" href="//maxcdn.bootstrapcdn.com/bootstrap/3.2.0/css/bootstrap.min.css">
     <link rel="stylesheet" type="text/css" href="css/style.css">
     <link rel="stylesheet" type="text/css" href="css/main.css">
   </head>
 <body>
-  <table id="batters_table" class="tablesorter">
+  <%= erb :_search_box, :locals => {:action => "/batters"} %>
+  <table id="batters_table" class="table tablesorter">
     <thead>
       <th>Player</th>
       <th>Team</th>
       <th>Pos</th>
       <th>Value</th>
+      <th>Dollars</th>
       <th>R</th>
       <th>HR</th>
       <th>RBI</th>
       <th>SB</th>
       <th>AVG</th>
       <th>OBP</th>
+      <th>zR</th>
+      <th>zHR</th>
+      <th>zRBI</th>
+      <th>zSB</th>
+      <th>zAVG</th>
+      <th>zOBP</th>
       <th>Yahoo</th>
       <th></th>
     </thead>
@@ -33,12 +41,19 @@
           <td><%= player[:team] %></td>
           <td><a href="/batters?position=<%= player[:position] %>&limit=20"><%= player[:position] %></a></td>
           <td><%= sprintf("%0.3f", player[:value]) %></td>
+          <td><%= sprintf("$%0.2f", player[:dollars]) %></td>
           <td><%= sprintf("%d", player[:r]) %></td>
           <td><%= sprintf("%d", player[:hr]) %></td>
           <td><%= sprintf("%d", player[:rbi]) %></td>
           <td><%= sprintf("%d", player[:sb]) %></td>
           <td><%= sprintf("%0.3f", player[:avg]) %></td>
           <td><%= sprintf("%0.3f", player[:obp]) %></td>
+          <td><%= sprintf("%0.3f", player[:r_val]) %></td>
+          <td><%= sprintf("%0.3f", player[:hr_val]) %></td>
+          <td><%= sprintf("%0.3f", player[:rbi_val]) %></td>
+          <td><%= sprintf("%0.3f", player[:sb_val]) %></td>
+          <td><%= sprintf("%0.3f", player[:avg_val]) %></td>
+          <td><%= sprintf("%0.3f", player[:obp_val]) %></td>
           <td>$<%= sprintf("%0d", player[:yahoo_value]) %></td>
           <td>
             <% unless player[:drafted] %>
@@ -52,7 +67,6 @@
       <% end %>
     </tbody>
   </table>
-  <%= erb :_search_box, :locals => {:action => "/batters"} %>
 </body>
 <foot>
   <script language="javascript" type="text/javascript" src="/javascripts/jquery-1.7.1.min.js" ></script>

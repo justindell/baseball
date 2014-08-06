@@ -3,6 +3,12 @@ require 'sequel'
 require 'csv'
 require 'mechanize'
 
+TEAMS = 12
+BUDGET = 260
+DOLLAR_POOL = TEAMS * BUDGET
+PITCHERS_DRAFTED = 120
+BATTERS_DRAFTED = 180
+TOTAL_DRAFTED = PITCHERS_DRAFTED + BATTERS_DRAFTED
 YAHOO_FREE_AGENT_URL = "http://baseball.fantasysports.yahoo.com/b1/82596/players"
 YAHOO_LOGIN_URL = "http://login.yahoo.com/config/login"
 FANGRAPHS_PROJECTIONS_URL = "http://www.fangraphs.com/projections.aspx?type=steamerr&team=0&players=0"
@@ -10,7 +16,13 @@ BASEBALL_REFERENCE_ROOKIES_URL = "http://www.baseball-reference.com/leagues/MLB/
 BATTING_CATEGORIES = %w[r hr rbi sb avg obp]
 PITCHING_CATEGORIES = %w[so sv era qs h_per_nine bb_per_nine]
 INVERSE_CATEGORIES = %w[era h_per_nine bb_per_nine]
+PLAY_TIME_THRESHOLD = 0.75
 BATTER_POSITIONS = %w[c 1b 2b 3b ss of dh]
+RATE_CATEGORIES = {'avg' => 'ab',
+                   'obp' => 'ab',
+                   'era' => 'ip',
+                   'h_per_nine' => 'ip',
+                   'bb_per_nine' => 'ip'}
 
 (puts "yahoo username and password required"; exit(1)) unless ARGV[0] && ARGV[1]
 
@@ -44,6 +56,20 @@ DB.create_table :players do
   Decimal :qs
   Decimal :h_per_nine
   Decimal :bb_per_nine
+  Decimal :r_val
+  Decimal :hr_val
+  Decimal :rbi_val
+  Decimal :sb_val
+  Decimal :avg_val
+  Decimal :obp_val
+  Decimal :w_val
+  Decimal :so_val
+  Decimal :sv_val
+  Decimal :era_val
+  Decimal :qs_val
+  Decimal :h_per_nine_val
+  Decimal :bb_per_nine_val
+  Decimal :dollars
   Decimal :value
   Decimal :yahoo_value, :default => 0
   TrueClass :drafted, :default => false
@@ -80,9 +106,11 @@ def parse_csv csv, position
     categories = if position == 'p'
                    player['h_per_nine'] = (row['h'].to_f * 9) / row['ip'].to_f
                    player['bb_per_nine'] = (row['bb'].to_f * 9) / row['ip'].to_f
+                   player['ip'] = row['ip'].to_f
                    player['qs'] = quality_starts(row)
                    PITCHING_CATEGORIES
                  else
+                   player['ab'] = row['ab'].to_f
                    BATTING_CATEGORIES
                  end
     categories.each{|c| player[c] = row[c].to_f if row[c]}
@@ -93,6 +121,7 @@ def parse_csv csv, position
 end
 
 def get_projections position
+  print " #{position}...\r"
   url = FANGRAPHS_PROJECTIONS_URL + (position == 'p' ? "&stats=pit&pos=all" : "&stats=bat&pos=#{position}")
   projections = @agent.get(url)
   form = projections.forms.first
@@ -102,17 +131,29 @@ def get_projections position
 end
 
 def calculate players, stat
-  vals = players.values.collect{|pl| pl[stat]}
+  vals = players.values.collect{|p| p[stat]}
   filtered = vals.select{|v| v != 0.0}
   if filtered.empty?
     puts("WARNING: No values found in csv for #{stat}")
     return
   end
+  rate_adj = avg players.values.collect{|p| p[RATE_CATEGORIES[stat]]} if RATE_CATEGORIES.has_key?(stat)
   stddev = std_dev filtered
   mean = avg filtered
   players.each do |k,v| 
     v["#{stat}_val"] = ((v[stat] - mean) / stddev)
+    v["#{stat}_val"] = v["#{stat}_val"] * (v[RATE_CATEGORIES[stat]] / rate_adj) if rate_adj
     v['value'] += v["#{stat}_val"]
+  end
+end
+
+def calcuate_dollar_value players, amount_drafted
+  pool = DOLLAR_POOL * (amount_drafted / TOTAL_DRAFTED.to_f)
+  total = players.map{|_,p| p['value']}.select{|v| v > 0}.inject(:+)
+  scaler = pool / total
+  players.each do |_,p|
+    dollars = p['value'] * scaler
+    p['dollars'] = dollars < 1 ? 1 : dollars
   end
 end
 
@@ -131,19 +172,23 @@ end
 puts "getting projections"
 batters = {}
 BATTER_POSITIONS.each do |pos|
-  print " #{pos}...\r"
   get_projections(pos).each do |name, player|
     existing = batters[name]
     player['position'] = "#{existing['position']},#{pos.upcase}" if existing && !existing['position'].match(pos.upcase)
     batters[name] = player
   end
 end
-print " p...\r"
 pitchers = get_projections 'p'
 
 puts "calculating value"
+batters = batters.sort_by{|_,p| p['ab']}.reverse.take((batters.size * PLAY_TIME_THRESHOLD).ceil).to_h
+pitchers = pitchers.sort_by{|_,p| p['ip']}.reverse.take((pitchers.size * PLAY_TIME_THRESHOLD).ceil).to_h
 BATTING_CATEGORIES.each { |stat| calculate batters, stat }
 PITCHING_CATEGORIES.each { |stat| calculate pitchers, stat }
+
+puts "calculating dollar values"
+calcuate_dollar_value batters, BATTERS_DRAFTED
+calcuate_dollar_value pitchers, PITCHERS_DRAFTED
 
 puts "inserting players"
 batters.merge(pitchers).each do |name, player|
@@ -152,6 +197,7 @@ batters.merge(pitchers).each do |name, player|
     :type => player['type'],
     :position => player['position'],
     :value => player['value'],
+    :dollars => player['dollars'],
     :r => player['r'],
     :hr => player['hr'],
     :rbi => player['rbi'],
@@ -164,6 +210,18 @@ batters.merge(pitchers).each do |name, player|
     :h_per_nine => player['h_per_nine'],
     :bb_per_nine => player['bb_per_nine'],
     :qs => player['qs'],
+    :r_val => player['r_val'],
+    :hr_val => player['hr_val'],
+    :rbi_val => player['rbi_val'],
+    :sb_val => player['sb_val'],
+    :avg_val => player['avg_val'],
+    :obp_val => player['obp_val'],
+    :so_val => player['so_val'],
+    :sv_val => player['sv_val'],
+    :era_val => player['era_val'],
+    :h_per_nine_val => player['h_per_nine_val'],
+    :bb_per_nine_val => player['bb_per_nine_val'],
+    :qs_val => player['qs_val'],
     :drafted => true)
 end
 
