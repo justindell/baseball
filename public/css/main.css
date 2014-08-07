@@ -1,33 +1,20 @@
 table.tablesorter {
+  margin-top: 0px;
+}
+
+.content {
   margin-top: 70px;
 }
 
+.player-name {
+  cursor: pointer;
+}
+
 tr {
-  border: none;
-  margin: 0px;
-  padding: 0px;
-}
-
-th, td {
-  text-align: left;
-  padding-right: 5px;
   font-weight: bold;
-  min-width: 45px;
 }
 
-.red { color: red; }
-.orange { color: orange; }
-.green { color: green; }
-.blue { color: blue; }
-.even { background: #DDD; }
-
-.drafted {
+tr.drafted {
   color: gray;
-  font-weight: none;
+  font-weight: normal;
 }
-
-#query {
-  top: 0px;
-  position: fixed;
-}
-

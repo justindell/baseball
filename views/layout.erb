@@ -1,0 +1,44 @@
+<html>
+  <head>
+    <link rel="stylesheet" href="//maxcdn.bootstrapcdn.com/bootstrap/3.2.0/css/bootstrap.min.css">
+    <link rel="stylesheet" type="text/css" href="css/style.css">
+    <link rel="stylesheet" type="text/css" href="css/radar-chart.min.css">
+    <link rel="stylesheet" type="text/css" href="css/main.css">
+    <script language="javascript" type="text/javascript" src="/javascripts/jquery-1.7.1.min.js" ></script>
+    <script language="javascript" type="text/javascript" src="/javascripts/jquery-tablesorter.min.js" ></script>
+    <script language="javascript" type="text/javascript" src="/javascripts/jquery.heatcolor.0.0.1.pack.js" ></script>
+    <script language="javascript" type="text/javascript" src="/javascripts/d3.min.js" ></script>
+    <script language="javascript" type="text/javascript" src="/javascripts/radar-chart.min.js" ></script>
+    <script language="javascript" type="text/javascript" src="/javascripts/application.js" ></script>
+  </head>
+  <body>
+    <div class='container-fluid'>
+      <nav class='nav navbar-default navbar-fixed-top' role='navigation'>
+      <div class='container-fluid'>
+        <ul class="nav navbar-nav">
+          <li <%= 'class="active"' if request.path == '/' %>><a href="/">All</a></li>
+          <li <%= 'class="active"' if request.path == '/batters' %>><a href="/batters">Batters</a></li>
+          <li <%= 'class="active"' if request.path == '/pitchers' %>><a href="/pitchers">Pitchers</a></li>
+        </ul>
+
+        <form action="<%= request.path %>" class="navbar-form navbar-left" role="search">
+          <div class="form-group">
+            <input type="text" class="form-control" name="position" value="<%= params[:position] %>" placeholder="Position">
+          </div>
+          <div class="form-group">
+            <input type="text" class="form-control" name="limit" value="<%= params[:limit] %>" placeholder="Limit">
+          </div>
+          <div class="form-group">
+            Hide Drafted: <input type="checkbox" name="hide-drafted" <%= "checked" if params['hide-drafted'] == 'on' %>>
+          </div>
+          <button type="submit" class="btn btn-primary">Submit</button>
+        </form>
+      </div>
+      </nav>
+      <div class='row content'>
+        <%= yield %>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

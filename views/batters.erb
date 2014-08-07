@@ -1,12 +1,5 @@
-<html>
-  <head>
-    <link rel="stylesheet" href="//maxcdn.bootstrapcdn.com/bootstrap/3.2.0/css/bootstrap.min.css">
-    <link rel="stylesheet" type="text/css" href="css/style.css">
-    <link rel="stylesheet" type="text/css" href="css/main.css">
-  </head>
-<body>
-  <%= erb :_search_box, :locals => {:action => "/batters"} %>
-  <table id="batters_table" class="table tablesorter">
+<div class='col-lg-8'>
+  <table id="batters_table" class="table table-condensed tablesorter">
     <thead>
       <th>Player</th>
       <th>Team</th>
@@ -30,13 +23,13 @@
     </thead>
     <tbody>
       <% @players.each_with_index do |player, idx| %>
-        <tr id="<%= player[:id] %>" class="<%= " drafted" if player[:drafted] %>">
+        <tr id="<%= player[:id] %>" class="<%= "drafted" if player[:drafted] %>">
           <td>
             <% if player[:injury] %><img height=16px width=16px src="css/injury.png" /><% end %>
             <% if player[:prospect] %><img height=16px width=16px src="css/fire.png" /><% end %>
             <% if player[:rookie] %><img height=16px width=16px src="css/diamond.png" /><% end %>
             <% if player[:favorite] %><img height=16px width=16px src="css/star.png" /><% end %>
-            <%= "#{idx + 1}. #{player[:name]}" %>
+            <span class="player-name"><%= "#{idx + 1}. #{player[:name]}" %></span>
           </td>
           <td><%= player[:team] %></td>
           <td><a href="/batters?position=<%= player[:position] %>&limit=20"><%= player[:position] %></a></td>
@@ -67,16 +60,15 @@
       <% end %>
     </tbody>
   </table>
-</body>
-<foot>
-  <script language="javascript" type="text/javascript" src="/javascripts/jquery-1.7.1.min.js" ></script>
-  <script language="javascript" type="text/javascript" src="/javascripts/jquery-tablesorter.min.js" ></script>
-  <script language="javascript" type="text/javascript" src="/javascripts/jquery.heatcolor.0.0.1.pack.js" ></script>
-  <script>
-    $(document).ready(function() { 
-      $("#batters_table").tablesorter();
-      $('#batters_table > tbody > tr').heatcolor(function() { return $("td:nth-child(4)",this).text(); });
-    });
-  </script> 
-</foot>
-</html>
+</div>
+<div class='col-lg-4'>
+  <div id='radar'></div>
+  <button style="display: none;" class='btn btn-success' id='clear-chart'>Clear</button>
+</div>
+<script>
+  $(document).ready(function() {
+    BASEBALL.initialize('batters');
+    $("#batters_table").tablesorter();
+    $('#batters_table > tbody > tr').heatcolor(function() { return $("td:nth-child(4)",this).text(); });
+  });
+</script>

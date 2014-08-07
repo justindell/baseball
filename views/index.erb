@@ -1,58 +1,43 @@
-<html>
-  <head>
-    <link rel="stylesheet" href="//maxcdn.bootstrapcdn.com/bootstrap/3.2.0/css/bootstrap.min.css">
-    <link rel="stylesheet" type="text/css" href="css/style.css">
-    <link rel="stylesheet" type="text/css" href="css/main.css">
-  </head>
-<body>
-  <%= erb :_search_box, :locals => {:action => "/index"} %>
-  <table id="players_table" class="table tablesorter">
-    <thead>
-      <th>Player</th>
-      <th>Team</th>
-      <th>Position</th>
-      <th>Value</th>
-      <th>Dollars</th>
-      <th>Yahoo</th>
-      <th></th>
-    </thead>
-    <tbody>
-      <% @players.each_with_index do |player, idx| %>
-        <tr id="<%= player[:id] %>" class="<%= "drafted" if player[:drafted] %>">
-          <td>
-            <% if player[:injury] %><img height=16px width=16px src="css/injury.png" /><% end %>
-            <% if player[:prospect] %><img height=16px width=16px src="css/fire.png" /><% end %>
-            <% if player[:rookie] %><img height=16px width=16px src="css/diamond.png" /><% end %>
-            <% if player[:favorite] %><img height=16px width=16px src="css/star.png" /><% end %>
-            <%= "#{idx + 1}. #{player[:name]}" %>
-          </td>
-          <td><%= player[:team] %></td>
-          <td><%= player[:position] %></td>
-          <td><%= sprintf("%0.3f", player[:value]) %></td>
-          <td><%= sprintf("$%0.2f", player[:dollars]) %></td>
-          <td>$<%= sprintf("%0d", player[:yahoo_value]) %></td>
-          <td>
-            <% unless player[:drafted] %>
-              <form class= "draft" action="draft" method="post">
-                <input type="hidden" name="player_id" value=<%= player[:id] %> />
-                <input type="submit" value="draft" />
-              </form>
-            <% end %>
-          </td>
-        </tr>
-      <% end %>
-    </tbody>
-  </table>
-</body>
-<foot>
-  <script language="javascript" type="text/javascript" src="/javascripts/jquery-1.7.1.min.js" ></script>
-  <script language="javascript" type="text/javascript" src="/javascripts/jquery-tablesorter.min.js" ></script>
-  <script language="javascript" type="text/javascript" src="/javascripts/jquery.heatcolor.0.0.1.pack.js" ></script>
-  <script>
-    $(document).ready(function() { 
-      $("#players_table").tablesorter();
-      $('#players_table > tbody > tr').heatcolor(function() { return $("td:nth-child(4)",this).text(); });
-    });
-  </script> 
-</foot>
-</html>
+<table id="players_table" class="table tablesorter">
+  <thead>
+    <th>Player</th>
+    <th>Team</th>
+    <th>Position</th>
+    <th>Value</th>
+    <th>Dollars</th>
+    <th>Yahoo</th>
+    <th></th>
+  </thead>
+  <tbody>
+    <% @players.each_with_index do |player, idx| %>
+      <tr id="<%= player[:id] %>" class="<%= "drafted" if player[:drafted] %>">
+        <td>
+          <% if player[:injury] %><img height=16px width=16px src="css/injury.png" /><% end %>
+          <% if player[:prospect] %><img height=16px width=16px src="css/fire.png" /><% end %>
+          <% if player[:rookie] %><img height=16px width=16px src="css/diamond.png" /><% end %>
+          <% if player[:favorite] %><img height=16px width=16px src="css/star.png" /><% end %>
+          <%= "#{idx + 1}. #{player[:name]}" %>
+        </td>
+        <td><%= player[:team] %></td>
+        <td><%= player[:position] %></td>
+        <td><%= sprintf("%0.3f", player[:value]) %></td>
+        <td><%= sprintf("$%0.2f", player[:dollars]) %></td>
+        <td>$<%= sprintf("%0d", player[:yahoo_value]) %></td>
+        <td>
+          <% unless player[:drafted] %>
+            <form class= "draft" action="draft" method="post">
+              <input type="hidden" name="player_id" value=<%= player[:id] %> />
+              <input type="submit" value="draft" />
+            </form>
+          <% end %>
+        </td>
+      </tr>
+    <% end %>
+  </tbody>
+</table>
+<script>
+  $(document).ready(function() {
+    $("#players_table").tablesorter();
+    $('#players_table > tbody > tr').heatcolor(function() { return $("td:nth-child(4)",this).text(); });
+  });
+</script>
