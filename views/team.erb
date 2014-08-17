@@ -1,0 +1,39 @@
+<div class='col-lg-8'>
+  <table id="team_table" class="table table-condensed tablesorter">
+    <thead>
+      <th>Player</th>
+      <th>Team</th>
+      <th>Pos</th>
+      <th>Value</th>
+      <th>Dollars</th>
+    </thead>
+    <tbody>
+      <% @players.each_with_index do |player, idx| %>
+        <tr id="<%= player[:id] %>">
+          <td>
+            <% if player[:list_of_twelve] %><img height=16px width=16px src="css/twelve.jpg" /><% end %>
+            <% if player[:injury] %><img height=16px width=16px src="css/injury.png" /><% end %>
+            <% if player[:prospect] %><img height=16px width=16px src="css/fire.png" /><% end %>
+            <% if player[:rookie] %><img height=16px width=16px src="css/diamond.png" /><% end %>
+            <% if player[:favorite] %><img height=16px width=16px src="css/star.png" /><% end %>
+            <span class="player-name"><%= "#{idx + 1}. #{player[:name]}" %></span>
+          </td>
+          <td><%= player[:team] %></td>
+          <td><%= player[:position] %></td>
+          <td><%= sprintf("%0.3f", player[:value]) %></td>
+          <td><%= sprintf("$%0.2f", player[:dollars]) %></td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+</div>
+<div class='col-lg-4'>
+  <div id='radar'></div>
+  <button style="display: none;" class='btn btn-success' id='clear-chart'>Clear</button>
+</div>
+<script>
+  $(document).ready(function() {
+    $("#team_table").tablesorter();
+    $('#team_table > tbody > tr').heatcolor(function() { return $("td:nth-child(4)",this).text(); });
+  });
+</script>

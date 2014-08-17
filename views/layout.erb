@@ -19,6 +19,7 @@
           <li <%= 'class="active"' if request.path == '/' %>><a href="/">All</a></li>
           <li <%= 'class="active"' if request.path == '/batters' %>><a href="/batters">Batters</a></li>
           <li <%= 'class="active"' if request.path == '/pitchers' %>><a href="/pitchers">Pitchers</a></li>
+          <li <%= 'class="active"' if request.path == '/team' %>><a href="/team">My Team</a></li>
         </ul>
 
         <form action="<%= request.path %>" class="navbar-form navbar-left" role="search">

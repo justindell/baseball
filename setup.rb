@@ -10,6 +10,7 @@ PITCHERS_DRAFTED = 120
 BATTERS_DRAFTED = 180
 TOTAL_DRAFTED = PITCHERS_DRAFTED + BATTERS_DRAFTED
 YAHOO_FREE_AGENT_URL = "http://baseball.fantasysports.yahoo.com/b1/82596/players"
+YAHOO_MY_TEAM_URL = "http://baseball.fantasysports.yahoo.com/b1/82596/4"
 YAHOO_LOGIN_URL = "http://login.yahoo.com/config/login"
 FANGRAPHS_PROJECTIONS_URL = "http://www.fangraphs.com/projections.aspx?type=steamerr&team=0&players=0"
 BASEBALL_REFERENCE_ROOKIES_URL = "http://www.baseball-reference.com/leagues/MLB/2014-rookies.shtml"
@@ -19,10 +20,10 @@ INVERSE_CATEGORIES = %w[era h_per_nine bb_per_nine]
 PLAY_TIME_THRESHOLD = 0.75
 BATTER_POSITIONS = %w[c 1b 2b 3b ss of dh]
 RATE_CATEGORIES = {'avg' => 'ab',
-                   'obp' => 'ab',
-                   'era' => 'ip',
-                   'h_per_nine' => 'ip',
-                   'bb_per_nine' => 'ip'}
+		   'obp' => 'ab',
+		   'era' => 'ip',
+		   'h_per_nine' => 'ip',
+		   'bb_per_nine' => 'ip'}
 
 (puts "yahoo username and password required"; exit(1)) unless ARGV[0] && ARGV[1]
 
@@ -73,6 +74,7 @@ DB.create_table :players do
   Decimal :value
   Decimal :yahoo_value, :default => 0
   TrueClass :drafted, :default => false
+  TrueClass :mine, :default => false
   TrueClass :list_of_twelve, :default => false
   TrueClass :sleeper, :default => false
   TrueClass :injury, :default => false
@@ -104,15 +106,15 @@ def parse_csv csv, position
   CSV.parse(csv, {:headers => true, :header_converters => :downcase}).each do |row|
     player = {'value' => 0, 'position' => position.upcase}
     categories = if position == 'p'
-                   player['h_per_nine'] = (row['h'].to_f * 9) / row['ip'].to_f
-                   player['bb_per_nine'] = (row['bb'].to_f * 9) / row['ip'].to_f
-                   player['ip'] = row['ip'].to_f
-                   player['qs'] = quality_starts(row)
-                   PITCHING_CATEGORIES
-                 else
-                   player['ab'] = row['ab'].to_f
-                   BATTING_CATEGORIES
-                 end
+		   player['h_per_nine'] = (row['h'].to_f * 9) / row['ip'].to_f
+		   player['bb_per_nine'] = (row['bb'].to_f * 9) / row['ip'].to_f
+		   player['ip'] = row['ip'].to_f
+		   player['qs'] = quality_starts(row)
+		   PITCHING_CATEGORIES
+		 else
+		   player['ab'] = row['ab'].to_f
+		   BATTING_CATEGORIES
+		 end
     categories.each{|c| player[c] = row[c].to_f if row[c]}
     INVERSE_CATEGORIES.each {|i| player[i] *= -1 if player[i]}
     players[row['name']] = player
@@ -237,6 +239,13 @@ end
 rookies.at('table#misc_pitching').css('tbody tr').each do |rookie|
   @players_table.filter(:name => rookie.css('td')[1].text).update(:rookie => true)
 end
+
+puts "updating my team"
+team = @agent.get(YAHOO_MY_TEAM_URL)
+team.search('.ysf-player-name > a.name').map(&:text).each do |p|
+  @players_table.filter(:name => p).update(:mine => true)
+end
+
 
 puts "updating list of 12"
 @players_table.filter(:name => 'Chris, Sale').update(:list_of_twelve => true)

@@ -20,6 +20,11 @@ get '/pitchers' do
   erb :pitchers
 end
 
+get '/team' do
+  @players = Calculate.team
+  erb :team
+end
+
 post '/draft' do
   Calculate.draft params[:player_id]
   redirect back
