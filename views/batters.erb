@@ -6,6 +6,7 @@
       <th>Pos</th>
       <th>Value</th>
       <th>Dollars</th>
+      <th>AB</th>
       <th>R</th>
       <th>HR</th>
       <th>RBI</th>
@@ -35,6 +36,7 @@
           <td><a href="/batters?position=<%= player[:position] %>&limit=20"><%= player[:position] %></a></td>
           <td><%= sprintf("%0.3f", player[:value]) %></td>
           <td><%= sprintf("$%0.2f", player[:dollars]) %></td>
+          <td><%= sprintf("%d", player[:ab]) %></td>
           <td><%= sprintf("%d", player[:r]) %></td>
           <td><%= sprintf("%d", player[:hr]) %></td>
           <td><%= sprintf("%d", player[:rbi]) %></td>

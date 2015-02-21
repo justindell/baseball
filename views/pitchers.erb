@@ -6,6 +6,7 @@
       <th>Position</th>
       <th>Value</th>
       <th>Dollars</th>
+      <th>IP</th>
       <th>SO</th>
       <th>SV</th>
       <th>ERA</th>
@@ -30,12 +31,13 @@
             <% if player[:prospect] %><img height=16px width=16px src="css/fire.png" /><% end %>
             <% if player[:rookie] %><img height=16px width=16px src="css/diamond.png" /><% end %>
             <% if player[:favorite] %><img height=16px width=16px src="css/star.png" /><% end %>
-            <a class="player-name"><%= "#{idx + 1}. #{player[:name]}" %></a>
+            <span class="player-name"><%= "#{idx + 1}. #{player[:name]}" %></a>
           </td>
           <td><%= player[:team] %></td>
-          <td><%= player[:position] %></td>
+          <td><a href="/pitchers?position=<%= player[:position] %>&limit=100"><%= player[:position] %></a></td>
           <td><%= sprintf("%0.3f", player[:value]) %></td>
           <td><%= sprintf("$%0.2f", player[:dollars]) %></td>
+          <td><%= sprintf("%d", player[:ip]) %></td>
           <td><%= sprintf("%d", player[:so]) %></td>
           <td><%= sprintf("%d", player[:sv]) %></td>
           <td><%= sprintf("%0.3f", player[:era]) %></td>
