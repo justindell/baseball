@@ -1,8 +1,7 @@
-<div class='col-lg-8'>
+<div class='col-lg-9'>
   <table id='players_table' class='table tablesorter'>
     <thead>
       <th>Player</th>
-      <th>Team</th>
       <th>Position</th>
       <th>Value</th>
       <th>Dollars</th>
@@ -28,12 +27,12 @@
           <td>
             <% if player[:list_of_twelve] %><img height=16px width=16px src="css/twelve.jpg" /><% end %>
             <% if player[:injury] %><img height=16px width=16px src="css/injury.png" /><% end %>
+            <% if player[:sleeper] %><img height=16px width=16px src="css/star.png" /><% end %>
             <% if player[:prospect] %><img height=16px width=16px src="css/fire.png" /><% end %>
             <% if player[:rookie] %><img height=16px width=16px src="css/diamond.png" /><% end %>
             <% if player[:favorite] %><img height=16px width=16px src="css/star.png" /><% end %>
             <span class="player-name"><%= "#{idx + 1}. #{player[:name]}" %></a>
           </td>
-          <td><%= player[:team] %></td>
           <td><a href="/pitchers?position=<%= player[:position] %>&limit=100"><%= player[:position] %></a></td>
           <td><%= sprintf("%0.3f", player[:value]) %></td>
           <td><%= sprintf("$%0.2f", player[:dollars]) %></td>
@@ -64,7 +63,7 @@
     </tbody>
   </table>
 </div>
-<div class='col-lg-4'>
+<div class='col-lg-3'>
   <div id='radar'></div>
   <button style="display: none;" class='btn btn-success' id='clear-chart'>Clear</button>
 </div>
@@ -72,6 +71,6 @@
   $(document).ready(function() {
     BASEBALL.initialize('pitchers');
     $("#players_table").tablesorter();
-    $("#players_table > tbody > tr").heatcolor(function() { return $("td:nth-child(4)",this).text(); });
+    $("#players_table > tbody > tr").heatcolor(function() { return $("td:nth-child(3)",this).text(); });
   });
 </script>

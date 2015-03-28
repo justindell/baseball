@@ -1,8 +1,7 @@
-<div class='col-lg-8'>
+<div class='col-lg-9'>
   <table id="batters_table" class="table table-condensed tablesorter">
     <thead>
       <th>Player</th>
-      <th>Team</th>
       <th>Pos</th>
       <th>Value</th>
       <th>Dollars</th>
@@ -27,12 +26,12 @@
         <tr id="<%= player[:id] %>" class="<%= "drafted" if player[:drafted] %>">
           <td>
             <% if player[:injury] %><img height=16px width=16px src="css/injury.png" /><% end %>
+            <% if player[:sleeper] %><img height=16px width=16px src="css/star.png" /><% end %>
             <% if player[:prospect] %><img height=16px width=16px src="css/fire.png" /><% end %>
             <% if player[:rookie] %><img height=16px width=16px src="css/diamond.png" /><% end %>
             <% if player[:favorite] %><img height=16px width=16px src="css/star.png" /><% end %>
             <span class="player-name"><%= "#{idx + 1}. #{player[:name]}" %></span>
           </td>
-          <td><%= player[:team] %></td>
           <td><a href="/batters?position=<%= player[:position] %>&limit=20"><%= player[:position] %></a></td>
           <td><%= sprintf("%0.3f", player[:value]) %></td>
           <td><%= sprintf("$%0.2f", player[:dollars]) %></td>
@@ -63,7 +62,7 @@
     </tbody>
   </table>
 </div>
-<div class='col-lg-4'>
+<div class='col-lg-3'>
   <div id='radar'></div>
   <button style="display: none;" class='btn btn-success' id='clear-chart'>Clear</button>
 </div>
@@ -71,6 +70,6 @@
   $(document).ready(function() {
     BASEBALL.initialize('batters');
     $("#batters_table").tablesorter();
-    $('#batters_table > tbody > tr').heatcolor(function() { return $("td:nth-child(4)",this).text(); });
+    $('#batters_table > tbody > tr').heatcolor(function() { return $("td:nth-child(3)",this).text(); });
   });
 </script>

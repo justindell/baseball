@@ -21,19 +21,19 @@ INVERSE_CATEGORIES = %w[era h_per_nine bb_per_nine]
 PLAY_TIME_THRESHOLD = 0.75
 BATTER_POSITIONS = %w[c 1b 2b 3b ss of dh]
 INFLATION = 1.2
-POSITION_STATS = {'C'  => {pct_budget: 0.04, above_replacement: 15},
-                  '1B' => {pct_budget: 0.12, above_replacement: 30},
+POSITION_STATS = {'C'  => {pct_budget: 0.04, above_replacement: 12},
+                  '1B' => {pct_budget: 0.12, above_replacement: 25},
                   '2B' => {pct_budget: 0.08, above_replacement: 20},
-                  '3B' => {pct_budget: 0.10, above_replacement: 25},
+                  '3B' => {pct_budget: 0.10, above_replacement: 20},
                   'SS' => {pct_budget: 0.08, above_replacement: 20},
-                  'OF' => {pct_budget: 0.25, above_replacement: 75},
-                  'DH' => {pct_budget: 0.04, above_replacement: 10},
+                  'OF' => {pct_budget: 0.25, above_replacement: 80},
+                  'DH' => {pct_budget: 0.04, above_replacement: 2},
                   'SP' => {pct_budget: 0.25, above_replacement: 80},
                   'RP' => {pct_budget: 0.07, above_replacement: 30}}
 BATTING_RATE_CATEGORIES = {'avg' => 'ab', 'obp' => 'ab'}
 PITCHING_RATE_CATEGORIES = {'era' => 'ip', 'h_per_nine' => 'ip', 'bb_per_nine' => 'ip'}
 
-(puts "yahoo username and password required"; exit(1)) unless ARGV[0] && ARGV[1]
+#(puts "yahoo username and password required"; exit(1)) unless ARGV[0] && ARGV[1]
 
 DB = Sequel.sqlite('baseball.sqlite')
 
@@ -128,6 +128,28 @@ def parse_csv csv, position
   players
 end
 
+def parse_full_csv csv
+  players = {}
+  CSV.open(csv, {:headers => true, :header_converters => :downcase}).each do |row|
+    player = {'value' => 0, 'position' => row['pos(20)'] || 'P' }
+    categories = if player['position'] == 'P'
+                   player['h_per_nine'] = (row['h'].to_f * 9) / row['ip'].to_f
+                   player['bb_per_nine'] = (row['bb'].to_f * 9) / row['ip'].to_f
+                   player['ip'] = row['ip'].to_f
+                   player['qs'] = quality_starts(row)
+                   player['position'] = row['gs'].to_f > 0 ? 'SP' : 'RP'
+                   PITCHING_CATEGORIES
+                 else
+                   player['ab'] = row['ab'].to_f
+                   BATTING_CATEGORIES
+                 end
+    categories.each{|c| player[c] = row[c].to_f if row[c]}
+    INVERSE_CATEGORIES.each {|i| player[i] *= -1 if player[i]}
+    players[row['name']] = player
+  end
+  players
+end
+
 def get_projections position
   print " #{position}...\r"
   url = FANGRAPHS_PROJECTIONS_URL + (position == 'p' ? "&stats=pit&pos=all" : "&stats=bat&pos=#{position}")
@@ -143,6 +165,8 @@ def calculate players, stat, rates
   if filtered.empty?
     if players.first.last['position'] == 'RP' && stat == 'qs'
       players.each{|k,v| v["qs_val"] = 0.0}
+    elsif players.first.last['position'] == 'SP' && stat == 'sv'
+      players.each{|k,v| v["sv_val"] = 0.0}
     else
       puts("WARNING: No values found in csv for #{stat}")
     end
@@ -151,14 +175,12 @@ def calculate players, stat, rates
   stddev = std_dev filtered
   mean = avg filtered
   players.each do |k,v|
-    v["#{stat}_val"] = (v[stat] - mean) / stddev
+    v["#{stat}_val"] = stddev == 0 ? 0 : (v[stat] - mean) / stddev
     rates.has_key?(stat) ? (v["#{stat}_val"] = v["#{stat}_val"] * v[rates[stat]]) : (v['value'] += v["#{stat}_val"])
   end
 end
 
 def recalculate_rate players, stat, rate_cat
-  #Simply multiply a players normal z-score in the batting average category by their AB total.
-  # Once that is done for every player at that position, you take the z-score of those wBA numbers and you have your final batting average value
   filtered = players.values.collect{|p| p["#{stat}_val"]}
   stddev = std_dev filtered
   mean = avg filtered
@@ -166,8 +188,6 @@ def recalculate_rate players, stat, rate_cat
     v["#{stat}_val"] = (v["#{stat}_val"] - mean) / stddev
     v['value'] += v["#{stat}_val"]
   end
-  #filtered = players.values.collect{|p| p[stat] * (rate_adj ? (p[rate_cat] / rate_adj) : 1) }.select{|v| v != 0.0}
-  #filtered = filtered.map{|v| v * v[rate_cat] / rate_adj}
 end
 
 def calculate_dollar_value position, players
@@ -214,21 +234,27 @@ BATTER_POSITIONS.each do |pos|
   end
 end
 pitchers = get_projections 'p'
+
+#batters = parse_full_csv 'data/batters.csv'
+#pitchers = parse_full_csv 'data/pitchers.csv'
+
 starting_pitchers = pitchers.select{|_,p| p['position'] == 'SP'}
 relief_pitchers = pitchers.select{|_,p| p['position'] == 'RP' && p['sv'] > 1}
 
 puts "calculating value"
 #batters = batters.sort_by{|_,p| p['ab']}.reverse.take((batters.size * PLAY_TIME_THRESHOLD).ceil).to_h
-batters = batters.select{|_,p| p['ab'] > 300}
 #starting_pitchers = starting_pitchers.sort_by{|_,p| p['ip']}.reverse.take((starting_pitchers.size * PLAY_TIME_THRESHOLD).ceil).to_h
+batters = batters.select{|_,p| p['ab'] > 300}
 starting_pitchers = starting_pitchers.select{|_,p| p['ip'] > 100}
-#relief_pitchers = relief_pitchers.sort_by{|_,p| p['ip']}.reverse.to_h
+puts starting_pitchers["Clayton Kershaw"].inspect
 BATTING_CATEGORIES.each { |stat| calculate batters, stat, BATTING_RATE_CATEGORIES }
 PITCHING_CATEGORIES.each { |stat| calculate starting_pitchers, stat, PITCHING_RATE_CATEGORIES }
 PITCHING_CATEGORIES.each { |stat| calculate relief_pitchers, stat, PITCHING_RATE_CATEGORIES }
+puts starting_pitchers["Clayton Kershaw"].inspect
 BATTING_RATE_CATEGORIES.each { |k,v| recalculate_rate batters, k, v }
 PITCHING_RATE_CATEGORIES.each { |k,v| recalculate_rate starting_pitchers, k, v }
 PITCHING_RATE_CATEGORIES.each { |k,v| recalculate_rate relief_pitchers, k, v }
+puts starting_pitchers["Clayton Kershaw"].inspect
 
 puts "calculating dollar values"
 calculate_dollar_value 'DH', batters.select{|_,p| p['position'] =~ /DH/}
@@ -298,7 +324,6 @@ end
 #end
 
 puts "updating list of 12"
-@players_table.filter(:name => 'Yu Darvis').update(:list_of_twelve => true)
 @players_table.filter(:name => 'Alex Cobb').update(:list_of_twelve => true)
 @players_table.filter(:name => 'Hisashi Iwakuma').update(:list_of_twelve => true)
 @players_table.filter(:name => 'Jose Quintana').update(:list_of_twelve => true)
