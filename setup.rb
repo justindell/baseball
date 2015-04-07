@@ -9,12 +9,14 @@ DOLLAR_POOL = TEAMS * BUDGET
 PITCHERS_DRAFTED = 120
 BATTERS_DRAFTED = 180
 TOTAL_DRAFTED = PITCHERS_DRAFTED + BATTERS_DRAFTED
-YAHOO_FREE_AGENT_URL = "http://baseball.fantasysports.yahoo.com/b1/82596/players"
-YAHOO_MY_TEAM_URL = "http://baseball.fantasysports.yahoo.com/b1/82596/4"
+YAHOO_LEAGUE_ID = 51957
+YAHOO_TEAM_ID = 5
+YAHOO_FREE_AGENT_URL = "http://baseball.fantasysports.yahoo.com/b1/#{YAHOO_LEAGUE_ID}/players"
+YAHOO_MY_TEAM_URL = "http://baseball.fantasysports.yahoo.com/b1/#{YAHOO_LEAGUE_ID}/#{YAHOO_TEAM_ID}"
 YAHOO_LOGIN_URL = "http://login.yahoo.com/config/login"
-#FANGRAPHS_PROJECTIONS_URL = "http://www.fangraphs.com/projections.aspx?type=steamerr&team=0&players=0"
-FANGRAPHS_PROJECTIONS_URL = "http://www.fangraphs.com/projections.aspx?type=steamer&team=0&players=0"
-BASEBALL_REFERENCE_ROOKIES_URL = "http://www.baseball-reference.com/leagues/MLB/2014-rookies.shtml"
+FANGRAPHS_PROJECTIONS_URL = "http://www.fangraphs.com/projections.aspx?type=steamerr&team=0&players=0"
+#FANGRAPHS_PROJECTIONS_URL = "http://www.fangraphs.com/projections.aspx?type=steamer&team=0&players=0"
+BASEBALL_REFERENCE_ROOKIES_URL = "http://www.baseball-reference.com/leagues/MLB/2015-rookies.shtml"
 BATTING_CATEGORIES = %w[r hr rbi sb avg obp]
 PITCHING_CATEGORIES = %w[so sv era qs h_per_nine bb_per_nine]
 INVERSE_CATEGORIES = %w[era h_per_nine bb_per_nine]
@@ -33,7 +35,7 @@ POSITION_STATS = {'C'  => {pct_budget: 0.04, above_replacement: 12},
 BATTING_RATE_CATEGORIES = {'avg' => 'ab', 'obp' => 'ab'}
 PITCHING_RATE_CATEGORIES = {'era' => 'ip', 'h_per_nine' => 'ip', 'bb_per_nine' => 'ip'}
 
-#(puts "yahoo username and password required"; exit(1)) unless ARGV[0] && ARGV[1]
+(puts "yahoo username and password required"; exit(1)) unless ARGV[0] && ARGV[1]
 
 DB = Sequel.sqlite('baseball.sqlite')
 
@@ -218,11 +220,11 @@ def get_free_agents type
   players
 end
 
-#@agent.get(YAHOO_FREE_AGENT_URL) # set referrer
-#login = @agent.get(YAHOO_LOGIN_URL).forms.first
-#login.username = ARGV[0]
-#login.passwd = ARGV[1]
-#login.submit
+@agent.get(YAHOO_FREE_AGENT_URL) # set referrer
+login = @agent.get(YAHOO_LOGIN_URL).forms.first
+login.username = ARGV[0]
+login.passwd = ARGV[1]
+login.submit
 
 puts "getting projections"
 batters = {}
@@ -246,15 +248,12 @@ puts "calculating value"
 #starting_pitchers = starting_pitchers.sort_by{|_,p| p['ip']}.reverse.take((starting_pitchers.size * PLAY_TIME_THRESHOLD).ceil).to_h
 batters = batters.select{|_,p| p['ab'] > 300}
 starting_pitchers = starting_pitchers.select{|_,p| p['ip'] > 100}
-puts starting_pitchers["Clayton Kershaw"].inspect
 BATTING_CATEGORIES.each { |stat| calculate batters, stat, BATTING_RATE_CATEGORIES }
 PITCHING_CATEGORIES.each { |stat| calculate starting_pitchers, stat, PITCHING_RATE_CATEGORIES }
 PITCHING_CATEGORIES.each { |stat| calculate relief_pitchers, stat, PITCHING_RATE_CATEGORIES }
-puts starting_pitchers["Clayton Kershaw"].inspect
 BATTING_RATE_CATEGORIES.each { |k,v| recalculate_rate batters, k, v }
 PITCHING_RATE_CATEGORIES.each { |k,v| recalculate_rate starting_pitchers, k, v }
 PITCHING_RATE_CATEGORIES.each { |k,v| recalculate_rate relief_pitchers, k, v }
-puts starting_pitchers["Clayton Kershaw"].inspect
 
 puts "calculating dollar values"
 calculate_dollar_value 'DH', batters.select{|_,p| p['position'] =~ /DH/}
@@ -301,12 +300,12 @@ batters.merge(starting_pitchers).merge(relief_pitchers).each do |name, player|
     :h_per_nine_val => player['h_per_nine_val'],
     :bb_per_nine_val => player['bb_per_nine_val'],
     :qs_val => player['qs_val'],
-    :drafted => false)
+    :drafted => true)
 end
 
-#puts "getting free agents"
-#free_agents = get_free_agents(:batter) + get_free_agents(:pitcher)
-#free_agents.each { |p| @players_table.filter(:name => p).update(:drafted => false) }
+puts "getting free agents"
+free_agents = get_free_agents(:batter) + get_free_agents(:pitcher)
+free_agents.each { |p| @players_table.filter(:name => p).update(:drafted => false) }
 
 #puts "updating rookies"
 #rookies = @agent.get(BASEBALL_REFERENCE_ROOKIES_URL)
@@ -317,11 +316,11 @@ end
   #@players_table.filter(:name => rookie.css('td')[1].text).update(:rookie => true)
 #end
 
-#puts "updating my team"
-#team = @agent.get(YAHOO_MY_TEAM_URL)
-#team.search('.ysf-player-name > a.name').map(&:text).each do |p|
-  #@players_table.filter(:name => p).update(:mine => true)
-#end
+puts "updating my team"
+team = @agent.get(YAHOO_MY_TEAM_URL)
+team.search('.ysf-player-name > a.name').map(&:text).each do |p|
+  @players_table.filter(:name => p).update(:mine => true)
+end
 
 puts "updating list of 12"
 @players_table.filter(:name => 'Alex Cobb').update(:list_of_twelve => true)
