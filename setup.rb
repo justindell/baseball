@@ -15,7 +15,6 @@ YAHOO_FREE_AGENT_URL = "http://baseball.fantasysports.yahoo.com/b1/#{YAHOO_LEAGU
 YAHOO_MY_TEAM_URL = "http://baseball.fantasysports.yahoo.com/b1/#{YAHOO_LEAGUE_ID}/#{YAHOO_TEAM_ID}"
 YAHOO_LOGIN_URL = "http://login.yahoo.com/config/login"
 FANGRAPHS_PROJECTIONS_URL = "http://www.fangraphs.com/projections.aspx?type=steamerr&team=0&players=0"
-#FANGRAPHS_PROJECTIONS_URL = "http://www.fangraphs.com/projections.aspx?type=steamer&team=0&players=0"
 BASEBALL_REFERENCE_ROOKIES_URL = "http://www.baseball-reference.com/leagues/MLB/2015-rookies.shtml"
 BATTING_CATEGORIES = %w[r hr rbi sb avg obp]
 PITCHING_CATEGORIES = %w[so sv era qs h_per_nine bb_per_nine]
@@ -130,28 +129,6 @@ def parse_csv csv, position
   players
 end
 
-def parse_full_csv csv
-  players = {}
-  CSV.open(csv, {:headers => true, :header_converters => :downcase}).each do |row|
-    player = {'value' => 0, 'position' => row['pos(20)'] || 'P' }
-    categories = if player['position'] == 'P'
-                   player['h_per_nine'] = (row['h'].to_f * 9) / row['ip'].to_f
-                   player['bb_per_nine'] = (row['bb'].to_f * 9) / row['ip'].to_f
-                   player['ip'] = row['ip'].to_f
-                   player['qs'] = quality_starts(row)
-                   player['position'] = row['gs'].to_f > 0 ? 'SP' : 'RP'
-                   PITCHING_CATEGORIES
-                 else
-                   player['ab'] = row['ab'].to_f
-                   BATTING_CATEGORIES
-                 end
-    categories.each{|c| player[c] = row[c].to_f if row[c]}
-    INVERSE_CATEGORIES.each {|i| player[i] *= -1 if player[i]}
-    players[row['name']] = player
-  end
-  players
-end
-
 def get_projections position
   print " #{position}...\r"
   url = FANGRAPHS_PROJECTIONS_URL + (position == 'p' ? "&stats=pit&pos=all" : "&stats=bat&pos=#{position}")
@@ -237,17 +214,12 @@ BATTER_POSITIONS.each do |pos|
 end
 pitchers = get_projections 'p'
 
-#batters = parse_full_csv 'data/batters.csv'
-#pitchers = parse_full_csv 'data/pitchers.csv'
-
 starting_pitchers = pitchers.select{|_,p| p['position'] == 'SP'}
 relief_pitchers = pitchers.select{|_,p| p['position'] == 'RP' && p['sv'] > 1}
 
 puts "calculating value"
-#batters = batters.sort_by{|_,p| p['ab']}.reverse.take((batters.size * PLAY_TIME_THRESHOLD).ceil).to_h
-#starting_pitchers = starting_pitchers.sort_by{|_,p| p['ip']}.reverse.take((starting_pitchers.size * PLAY_TIME_THRESHOLD).ceil).to_h
-batters = batters.select{|_,p| p['ab'] > 300}
-starting_pitchers = starting_pitchers.select{|_,p| p['ip'] > 100}
+batters = batters.sort_by{|_,p| p['ab']}.reverse.take((batters.size * PLAY_TIME_THRESHOLD).ceil).to_h
+starting_pitchers = starting_pitchers.sort_by{|_,p| p['ip']}.reverse.take((starting_pitchers.size * PLAY_TIME_THRESHOLD).ceil).to_h
 BATTING_CATEGORIES.each { |stat| calculate batters, stat, BATTING_RATE_CATEGORIES }
 PITCHING_CATEGORIES.each { |stat| calculate starting_pitchers, stat, PITCHING_RATE_CATEGORIES }
 PITCHING_CATEGORIES.each { |stat| calculate relief_pitchers, stat, PITCHING_RATE_CATEGORIES }
@@ -307,14 +279,14 @@ puts "getting free agents"
 free_agents = get_free_agents(:batter) + get_free_agents(:pitcher)
 free_agents.each { |p| @players_table.filter(:name => p).update(:drafted => false) }
 
-#puts "updating rookies"
-#rookies = @agent.get(BASEBALL_REFERENCE_ROOKIES_URL)
-#rookies.at('table#misc_batting').css('tbody tr').each do |rookie|
-  #@players_table.filter(:name => rookie.css('td')[1].text).update(:rookie => true)
-#end
-#rookies.at('table#misc_pitching').css('tbody tr').each do |rookie|
-  #@players_table.filter(:name => rookie.css('td')[1].text).update(:rookie => true)
-#end
+puts "updating rookies"
+rookies = @agent.get(BASEBALL_REFERENCE_ROOKIES_URL)
+rookies.at('table#misc_batting').css('tbody tr').each do |rookie|
+  @players_table.filter(:name => rookie.css('td')[1].text).update(:rookie => true)
+end
+rookies.at('table#misc_pitching').css('tbody tr').each do |rookie|
+  @players_table.filter(:name => rookie.css('td')[1].text).update(:rookie => true)
+end
 
 puts "updating my team"
 team = @agent.get(YAHOO_MY_TEAM_URL)
