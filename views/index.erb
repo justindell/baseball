@@ -5,7 +5,9 @@
     <th>Position</th>
     <th>Value</th>
     <th>Dollars</th>
+    <th>BP</th>
     <th>Yahoo</th>
+    <th>Current</th>
     <th></th>
   </thead>
   <tbody>
@@ -22,7 +24,9 @@
         <td><%= player[:position] %></td>
         <td><%= sprintf("%0.3f", player[:value]) %></td>
         <td><%= sprintf("$%0.2f", player[:dollars]) %></td>
-        <td>$<%= sprintf("%0d", player[:yahoo_value]) %></td>
+        <td><%= sprintf("$%0d", player[:bp_value]) %></td>
+        <td><%= sprintf("%0d", player[:yahoo_rank]) %></td>
+        <td><%= sprintf("%0d", player[:yahoo_current]) %></td>
         <td>
           <% unless player[:drafted] %>
             <form class= "draft" action="draft" method="post">

@@ -2,6 +2,9 @@ require 'rubygems'
 require 'sequel'
 require 'csv'
 require 'mechanize'
+require 'active_support/inflector'
+
+BP_FILE = '/Users/justin/Downloads/pfmdata_08-07-2015_09-15-44.csv'
 
 TEAMS = 12
 BUDGET = 260
@@ -78,7 +81,9 @@ DB.create_table :players do
   Decimal :bb_per_nine_val
   Decimal :dollars
   Decimal :value
-  Decimal :yahoo_value, :default => 0
+  Decimal :bp_value, :default => 0
+  Decimal :yahoo_rank, :default => 0
+  Decimal :yahoo_current, :default => 0
   TrueClass :drafted, :default => false
   TrueClass :mine, :default => false
   TrueClass :list_of_twelve, :default => false
@@ -186,15 +191,33 @@ def calculate_dollar_value position, players
 end
 
 def get_free_agents type
-  url = YAHOO_FREE_AGENT_URL + (type == :pitcher ? "?pos=P" : "")
+  url = YAHOO_FREE_AGENT_URL + (type == :pitcher ? "?pos=P" : "?pos=B")
   players_page = @agent.get(url)
-  players = players_page.links.select{|l| l.attributes['class'] =~ /name/}.map(&:to_s)
+  players = players_page.links.select{|l| l.attributes['class'] =~ /name/}.map{|p| ActiveSupport::Inflector.transliterate(p.to_s)}
   10.times do |i|
     print " #{type.to_s} page #{i + 1}...\r"
     players_page = players_page.link_with(:text => "Next 25").click
-    players += players_page.links.select{|l| l.attributes['class'] =~ /name/}.map(&:to_s)
+    players += players_page.links.select{|l| l.attributes['class'] =~ /name/}.map{|p| ActiveSupport::Inflector.transliterate(p.to_s)}
   end
   players
+end
+
+def set_yahoo_rank player
+  name = ActiveSupport::Inflector.transliterate(player.search('.name').text)
+  rank = player.search('td')[6].text
+  current = player.search('td')[7].text
+  @players_table.filter(:name => name).update(:yahoo_rank => rank, :yahoo_current => current) if name && rank && current
+end
+
+def update_yahoo_ranks type
+  url = YAHOO_FREE_AGENT_URL + (type == :pitcher ? "?pos=P" : "?pos=B") + "&status=ALL"
+  players_page = @agent.get(url)
+  players_page.search('table.Table.Table-px-xs tbody tr').each { |player| set_yahoo_rank(player) }
+  15.times do |i|
+    print " #{type.to_s} page #{i + 1}...\r"
+    players_page = players_page.link_with(:text => "Next 25").click
+    players_page.search('table.Table.Table-px-xs tbody tr').each { |player| set_yahoo_rank(player) }
+  end
 end
 
 @agent.get(YAHOO_FREE_AGENT_URL) # set referrer
@@ -238,6 +261,14 @@ calculate_dollar_value 'OF', batters.select{|_,p| p['position'] =~ /OF/}
 calculate_dollar_value 'SP', starting_pitchers
 calculate_dollar_value 'RP', relief_pitchers
 
+puts "adding baseball prospectus values"
+CSV.open(BP_FILE, headers: true, header_converters: [:downcase]).each do |player|
+  name = "#{player['player'].split(',')[1]} #{player['player'].split(',')[0]}".strip
+  batters[name]['bp_value'] = player['$$$'].gsub('$', '') if batters[name]
+  starting_pitchers[name]['bp_value'] = player['$$$'].gsub('$', '') if starting_pitchers[name]
+  relief_pitchers[name]['bp_value'] = player['$$$'].gsub('$', '') if relief_pitchers[name]
+end
+
 puts "inserting players"
 batters.merge(starting_pitchers).merge(relief_pitchers).each do |name, player|
   @players_table.insert(
@@ -272,8 +303,15 @@ batters.merge(starting_pitchers).merge(relief_pitchers).each do |name, player|
     :h_per_nine_val => player['h_per_nine_val'],
     :bb_per_nine_val => player['bb_per_nine_val'],
     :qs_val => player['qs_val'],
+    :bp_value => player['bp_value'] || 0,
+    :yahoo_rank => 0,
+    :yahoo_current => 0,
     :drafted => true)
 end
+
+puts "updating yahoo ranks"
+update_yahoo_ranks :batter
+update_yahoo_ranks :pitcher
 
 puts "getting free agents"
 free_agents = get_free_agents(:batter) + get_free_agents(:pitcher)

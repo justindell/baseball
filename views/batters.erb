@@ -18,7 +18,9 @@
       <th>zSB</th>
       <th>zAVG</th>
       <th>zOBP</th>
+      <th>BP</th>
       <th>Yahoo</th>
+      <th>Current</th>
       <th></th>
     </thead>
     <tbody>
@@ -48,7 +50,9 @@
           <td><%= sprintf("%0.3f", player[:sb_val]) %></td>
           <td><%= sprintf("%0.3f", player[:avg_val]) %></td>
           <td><%= sprintf("%0.3f", player[:obp_val]) %></td>
-          <td>$<%= sprintf("%0d", player[:yahoo_value]) %></td>
+          <td><%= sprintf("$%0d", player[:bp_value]) %></td>
+          <td><%= sprintf("%0d", player[:yahoo_rank]) %></td>
+          <td><%= sprintf("%0d", player[:yahoo_current]) %></td>
           <td>
             <% unless player[:drafted] %>
               <form class= "draft" action="draft" method="post">
