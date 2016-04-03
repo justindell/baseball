@@ -4,7 +4,7 @@ require 'csv'
 require 'mechanize'
 require 'active_support/inflector'
 
-BP_FILE = '/Users/justin/Downloads/pfmdata_08-07-2015_09-15-44.csv'
+BP_FILE = 'pfmdata_03-28-2016_11-43-25.csv'
 
 TEAMS = 12
 BUDGET = 260
@@ -17,7 +17,7 @@ YAHOO_TEAM_ID = 5
 YAHOO_FREE_AGENT_URL = "http://baseball.fantasysports.yahoo.com/b1/#{YAHOO_LEAGUE_ID}/players"
 YAHOO_MY_TEAM_URL = "http://baseball.fantasysports.yahoo.com/b1/#{YAHOO_LEAGUE_ID}/#{YAHOO_TEAM_ID}"
 YAHOO_LOGIN_URL = "http://login.yahoo.com/config/login"
-FANGRAPHS_PROJECTIONS_URL = "http://www.fangraphs.com/projections.aspx?type=steamerr&team=0&players=0"
+FANGRAPHS_PROJECTIONS_URL = "http://www.fangraphs.com/projections.aspx?type=steamer&team=0&players=0"
 BASEBALL_REFERENCE_ROOKIES_URL = "http://www.baseball-reference.com/leagues/MLB/2015-rookies.shtml"
 BATTING_CATEGORIES = %w[r hr rbi sb avg obp]
 PITCHING_CATEGORIES = %w[so sv era qs h_per_nine bb_per_nine]
@@ -333,16 +333,74 @@ team.search('.ysf-player-name > a.name').map(&:text).each do |p|
 end
 
 puts "updating list of 12"
-@players_table.filter(:name => 'Alex Cobb').update(:list_of_twelve => true)
-@players_table.filter(:name => 'Hisashi Iwakuma').update(:list_of_twelve => true)
-@players_table.filter(:name => 'Jose Quintana').update(:list_of_twelve => true)
-@players_table.filter(:name => 'Henderson Alvarez').update(:list_of_twelve => true)
-@players_table.filter(:name => 'Josh Collmenter').update(:list_of_twelve => true)
-@players_table.filter(:name => 'Wei-Yin Chen').update(:list_of_twelve => true)
-@players_table.filter(:name => 'Alfredo Simon').update(:list_of_twelve => true)
-@players_table.filter(:name => 'Brett Anderson').update(:list_of_twelve => true)
-@players_table.filter(:name => 'Kris Medlen').update(:list_of_twelve => true)
-@players_table.filter(:name => 'Ivan Nova').update(:list_of_twelve => true)
-@players_table.filter(:name => 'Tommy Milone').update(:list_of_twelve => true)
-@players_table.filter(:name => 'Jordan Lyles').update(:list_of_twelve => true)
-@players_table.filter(:name => 'Marco Estrada').update(:list_of_twelve => true)
+@players_table.filter(:name => 'Corey Kluber').update(:list_of_twelve => true)
+@players_table.filter(:name => 'Dallas Keuchel').update(:list_of_twelve => true)
+@players_table.filter(:name => 'Sonny Gray').update(:list_of_twelve => true)
+@players_table.filter(:name => 'Carlos Carrasco').update(:list_of_twelve => true)
+@players_table.filter(:name => 'Chris Archer').update(:list_of_twelve => true)
+@players_table.filter(:name => 'Tyson Ross').update(:list_of_twelve => true)
+@players_table.filter(:name => 'Shelby Miller').update(:list_of_twelve => true)
+@players_table.filter(:name => 'Garrett Richards').update(:list_of_twelve => true)
+@players_table.filter(:name => 'Julio Teheran').update(:list_of_twelve => true)
+@players_table.filter(:name => 'Andrew Cashner').update(:list_of_twelve => true)
+@players_table.filter(:name => 'Nathan Eovaldi').update(:list_of_twelve => true)
+@players_table.filter(:name => 'Hector Santiago').update(:list_of_twelve => true)
+@players_table.filter(:name => 'Wily Peralta').update(:list_of_twelve => true)
+@players_table.filter(:name => 'Rich Hill').update(:list_of_twelve => true)
+@players_table.filter(:name => 'Jeff Locke').update(:list_of_twelve => true)
+@players_table.filter(:name => 'Tom Koehler').update(:list_of_twelve => true)
+@players_table.filter(:name => 'Josh Tomlin').update(:list_of_twelve => true)
+@players_table.filter(:name => 'Jesse Chavez').update(:list_of_twelve => true)
+@players_table.filter(:name => 'Miguel Gonzalez').update(:list_of_twelve => true)
+
+puts 'updating prospects'
+@players_table.filter(:name => 'Corey Seager').update(:prospect => true)
+@players_table.filter(:name => 'Byron Buxton').update(:prospect => true)
+@players_table.filter(:name => 'Yoan Moncada').update(:prospect => true)
+@players_table.filter(:name => 'Julio Urias').update(:prospect => true)
+@players_table.filter(:name => 'Lucas Giolito').update(:prospect => true)
+@players_table.filter(:name => 'J.P. Crawford').update(:prospect => true)
+@players_table.filter(:name => 'Alex Reyes').update(:prospect => true)
+@players_table.filter(:name => 'Orlando Arcia').update(:prospect => true)
+@players_table.filter(:name => 'Trea Turner').update(:prospect => true)
+@players_table.filter(:name => 'Joey Gallo').update(:prospect => true)
+@players_table.filter(:name => 'A.J. Reed').update(:prospect => true)
+@players_table.filter(:name => 'Blake Snell').update(:prospect => true)
+@players_table.filter(:name => 'Steven Matz').update(:prospect => true)
+@players_table.filter(:name => 'Tyler Glasnow').update(:prospect => true)
+@players_table.filter(:name => 'Andrew Benintendi').update(:prospect => true)
+@players_table.filter(:name => 'Lewis Brinson').update(:prospect => true)
+@players_table.filter(:name => 'Dansby Swanson').update(:prospect => true)
+@players_table.filter(:name => 'Rafael Devers').update(:prospect => true)
+@players_table.filter(:name => 'Anderson Espinoza').update(:prospect => true)
+@players_table.filter(:name => 'Francis Martes').update(:prospect => true)
+@players_table.filter(:name => 'Nomar Mazara').update(:prospect => true)
+@players_table.filter(:name => 'Austin Meadows').update(:prospect => true)
+@players_table.filter(:name => 'Jose De Leon').update(:prospect => true)
+@players_table.filter(:name => 'Sean Newcomb').update(:prospect => true)
+@players_table.filter(:name => 'Anthony Alford of').update(:prospect => true)
+@players_table.filter(:name => 'Jorge Mateo').update(:prospect => true)
+@players_table.filter(:name => 'Nick Williams').update(:prospect => true)
+@players_table.filter(:name => 'Jose Berrios').update(:prospect => true)
+@players_table.filter(:name => 'Raul A. Mondesi').update(:prospect => true)
+@players_table.filter(:name => 'Max Kepler').update(:prospect => true)
+@players_table.filter(:name => 'Bradley Zimmer').update(:prospect => true)
+@players_table.filter(:name => 'Robert Stephenson').update(:prospect => true)
+@players_table.filter(:name => 'Victor Robles').update(:prospect => true)
+@players_table.filter(:name => 'Cody Reed').update(:prospect => true)
+@players_table.filter(:name => 'Franklin Barreto ss').update(:prospect => true)
+@players_table.filter(:name => 'Gary Sanchez').update(:prospect => true)
+@players_table.filter(:name => 'Jon Gray').update(:prospect => true)
+@players_table.filter(:name => 'Josh Bell').update(:prospect => true)
+@players_table.filter(:name => 'David Dahl').update(:prospect => true)
+@players_table.filter(:name => 'Brendan Rodgers').update(:prospect => true)
+@players_table.filter(:name => 'Gleyber Torres').update(:prospect => true)
+@players_table.filter(:name => 'Alex Bregman').update(:prospect => true)
+@players_table.filter(:name => 'Ryan McMahon').update(:prospect => true)
+@players_table.filter(:name => 'Clint Frazier').update(:prospect => true)
+@players_table.filter(:name => 'Tim Anderson').update(:prospect => true)
+@players_table.filter(:name => 'Willy Adames').update(:prospect => true)
+@players_table.filter(:name => 'Michael Fulmer').update(:prospect => true)
+@players_table.filter(:name => 'Sean Manaea').update(:prospect => true)
+@players_table.filter(:name => 'Trent Clark').update(:prospect => true)
+@players_table.filter(:name => 'Kenta Maeda').update(:prospect => true)

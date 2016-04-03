@@ -5,6 +5,7 @@
       <th>Pos</th>
       <th>Value</th>
       <th>Dollars</th>
+      <th>BP</th>
       <th>AB</th>
       <th>R</th>
       <th>HR</th>
@@ -18,7 +19,6 @@
       <th>zSB</th>
       <th>zAVG</th>
       <th>zOBP</th>
-      <th>BP</th>
       <th>Yahoo</th>
       <th>Current</th>
       <th></th>
@@ -37,6 +37,7 @@
           <td><a href="/batters?position=<%= player[:position] %>&limit=20"><%= player[:position] %></a></td>
           <td><%= sprintf("%0.3f", player[:value]) %></td>
           <td><%= sprintf("$%0.2f", player[:dollars]) %></td>
+          <td><%= sprintf("$%0.2f", player[:bp_value]) %></td>
           <td><%= sprintf("%d", player[:ab]) %></td>
           <td><%= sprintf("%d", player[:r]) %></td>
           <td><%= sprintf("%d", player[:hr]) %></td>
@@ -50,7 +51,6 @@
           <td><%= sprintf("%0.3f", player[:sb_val]) %></td>
           <td><%= sprintf("%0.3f", player[:avg_val]) %></td>
           <td><%= sprintf("%0.3f", player[:obp_val]) %></td>
-          <td><%= sprintf("$%0d", player[:bp_value]) %></td>
           <td><%= sprintf("%0d", player[:yahoo_rank]) %></td>
           <td><%= sprintf("%0d", player[:yahoo_current]) %></td>
           <td>
@@ -73,7 +73,7 @@
 <script>
   $(document).ready(function() {
     BASEBALL.initialize('batters');
-    $("#batters_table").tablesorter();
-    $('#batters_table > tbody > tr').heatcolor(function() { return $("td:nth-child(3)",this).text(); });
+    $("#batters_table").tablesorter({sortList: [[4,1]]});
+    $('#batters_table > tbody > tr').heatcolor(function() { return $("td:nth-child(5)",this).text().replace('\$', ''); });
   });
 </script>

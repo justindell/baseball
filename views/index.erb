@@ -1,47 +1,47 @@
-<table id="players_table" class="table tablesorter">
-  <thead>
-    <th>Player</th>
-    <th>Team</th>
-    <th>Position</th>
-    <th>Value</th>
-    <th>Dollars</th>
-    <th>BP</th>
-    <th>Yahoo</th>
-    <th>Current</th>
-    <th></th>
-  </thead>
-  <tbody>
-    <% @players.each_with_index do |player, idx| %>
-      <tr id="<%= player[:id] %>" class="<%= "drafted" if player[:drafted] %>">
-        <td>
-          <% if player[:injury] %><img height=16px width=16px src="css/injury.png" /><% end %>
-          <% if player[:prospect] %><img height=16px width=16px src="css/fire.png" /><% end %>
-          <% if player[:rookie] %><img height=16px width=16px src="css/diamond.png" /><% end %>
-          <% if player[:favorite] %><img height=16px width=16px src="css/star.png" /><% end %>
-          <%= "#{idx + 1}. #{player[:name]}" %>
-        </td>
-        <td><%= player[:team] %></td>
-        <td><%= player[:position] %></td>
-        <td><%= sprintf("%0.3f", player[:value]) %></td>
-        <td><%= sprintf("$%0.2f", player[:dollars]) %></td>
-        <td><%= sprintf("$%0d", player[:bp_value]) %></td>
-        <td><%= sprintf("%0d", player[:yahoo_rank]) %></td>
-        <td><%= sprintf("%0d", player[:yahoo_current]) %></td>
-        <td>
-          <% unless player[:drafted] %>
-            <form class= "draft" action="draft" method="post">
-              <input type="hidden" name="player_id" value=<%= player[:id] %> />
-              <input type="submit" value="draft" />
-            </form>
-          <% end %>
-        </td>
-      </tr>
-    <% end %>
-  </tbody>
-</table>
-<script>
-  $(document).ready(function() {
-    $("#players_table").tablesorter();
-    $('#players_table > tbody > tr').heatcolor(function() { return $("td:nth-child(4)",this).text(); });
-  });
-</script>
+<div class 'col-lg-12'>
+  <table id="players_table" class="table tablesorter">
+    <thead>
+      <th>Player</th>
+      <th>Position</th>
+      <th>Value</th>
+      <th>Dollars</th>
+      <th>BP</th>
+      <th>Yahoo</th>
+      <th>Current</th>
+      <th></th>
+    </thead>
+    <tbody>
+      <% @players.each_with_index do |player, idx| %>
+        <tr id="<%= player[:id] %>" class="<%= "drafted" if player[:drafted] %>">
+          <td>
+            <% if player[:injury] %><img height=16px width=16px src="css/injury.png" /><% end %>
+            <% if player[:prospect] %><img height=16px width=16px src="css/fire.png" /><% end %>
+            <% if player[:rookie] %><img height=16px width=16px src="css/diamond.png" /><% end %>
+            <% if player[:favorite] %><img height=16px width=16px src="css/star.png" /><% end %>
+            <%= "#{idx + 1}. #{player[:name]}" %>
+          </td>
+          <td><%= player[:position] %></td>
+          <td><%= sprintf("%0.3f", player[:value]) %></td>
+          <td><%= sprintf("$%0.2f", player[:dollars]) %></td>
+          <td><%= sprintf("$%0.2f", player[:bp_value]) %></td>
+          <td><%= sprintf("%0d", player[:yahoo_rank]) %></td>
+          <td><%= sprintf("%0d", player[:yahoo_current]) %></td>
+          <td>
+            <% unless player[:drafted] %>
+              <form class= "draft" action="draft" method="post">
+                <input type="hidden" name="player_id" value=<%= player[:id] %> />
+                <input type="submit" value="draft" />
+              </form>
+            <% end %>
+          </td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+  <script>
+    $(document).ready(function() {
+      $("#players_table").tablesorter({sortList: [[4,1]]});
+      $('#players_table > tbody > tr').heatcolor(function() { return $("td:nth-child(5)",this).text().replace('\$', ''); });
+    });
+  </script>
+</div>
