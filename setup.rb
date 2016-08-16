@@ -4,7 +4,7 @@ require 'csv'
 require 'mechanize'
 require 'active_support/inflector'
 
-BP_FILE = 'pfmdata_03-28-2016_11-43-25.csv'
+BP_FILE = 'pfmdata_05-23-2016_18-33-00.csv'
 
 TEAMS = 12
 BUDGET = 260
@@ -12,13 +12,13 @@ DOLLAR_POOL = TEAMS * BUDGET
 PITCHERS_DRAFTED = 120
 BATTERS_DRAFTED = 180
 TOTAL_DRAFTED = PITCHERS_DRAFTED + BATTERS_DRAFTED
-YAHOO_LEAGUE_ID = 51957
+YAHOO_LEAGUE_ID = 67272
 YAHOO_TEAM_ID = 5
 YAHOO_FREE_AGENT_URL = "http://baseball.fantasysports.yahoo.com/b1/#{YAHOO_LEAGUE_ID}/players"
 YAHOO_MY_TEAM_URL = "http://baseball.fantasysports.yahoo.com/b1/#{YAHOO_LEAGUE_ID}/#{YAHOO_TEAM_ID}"
 YAHOO_LOGIN_URL = "http://login.yahoo.com/config/login"
 FANGRAPHS_PROJECTIONS_URL = "http://www.fangraphs.com/projections.aspx?type=steamer&team=0&players=0"
-BASEBALL_REFERENCE_ROOKIES_URL = "http://www.baseball-reference.com/leagues/MLB/2015-rookies.shtml"
+BASEBALL_REFERENCE_ROOKIES_URL = "http://www.baseball-reference.com/leagues/MLB/2016-rookies.shtml"
 BATTING_CATEGORIES = %w[r hr rbi sb avg obp]
 PITCHING_CATEGORIES = %w[so sv era qs h_per_nine bb_per_nine]
 INVERSE_CATEGORIES = %w[era h_per_nine bb_per_nine]
