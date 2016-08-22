@@ -4,7 +4,7 @@ require 'csv'
 require 'mechanize'
 require 'active_support/inflector'
 
-BP_FILE = 'pfmdata_05-23-2016_18-33-00.csv'
+BP_FILE = 'pfmdata_08-16-2016_09-08-43.csv'
 
 TEAMS = 12
 BUDGET = 260
@@ -214,7 +214,8 @@ def update_yahoo_ranks type
   players_page = @agent.get(url)
   players_page.search('table.Table.Table-px-xs tbody tr').each { |player| set_yahoo_rank(player) }
   15.times do |i|
-    print " #{type.to_s} page #{i + 1}...\r"
+    puts " #{type.to_s} page #{i + 1}...\r"
+    puts players_page.links.inspect
     players_page = players_page.link_with(:text => "Next 25").click
     players_page.search('table.Table.Table-px-xs tbody tr').each { |player| set_yahoo_rank(player) }
   end

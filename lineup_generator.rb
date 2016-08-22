@@ -1,23 +1,48 @@
 require 'rglpk'
 require 'csv'
 
-NUM_LINEUPS = 50
+SITE = 'fanduel'
+NUM_LINEUPS = 5
 STACK_SIZE = 4
-OVERLAP = 4
-INCLUDED_TEAMS = %w(BOS BAL LAD PHI CLE CHW KCR DET MIA CIN MIN ATL MIL CHC OAK TEX ARI NYM SEA LAA)
+STACK_OVERLAP = 3
+INDIVIDUAL_OVERLAP = 3
+INCLUDED_TEAMS = %w()
+EXCLUDED_TEAMS = %w()
 
+SITE_MAP = { 'fanduel'    => { team_size: 9, num_pitchers: 1, pitcher: 'P', csv_header: %w(P C 1B 2B 3B SS OF OF OF), salary: 35000, id: lambda { |team, position| lookup_fanduel_id(team, position) } },
+             'draftkings' => { team_size: 10, num_pitchers: 2, pitcher: 'SP', csv_header: %w(P P C 1B 2B 3B SS OF OF OF) , salary: 50000, id: lambda { |team, position| lookup_draftkings_id(team, position) } } }
 @players = []
 @stacks = []
+@config = SITE_MAP[SITE]
+@salaries = CSV.open(SITE + '.csv', headers: true, header_converters: :downcase).map { |row| row.to_hash }
+`curl --insecure https://rotogrinders.com/projected-stats/mlb-pitcher.csv?site=#{SITE} > pitchers.csv`
+`curl --insecure https://rotogrinders.com/projected-stats/mlb-hitter.csv?site=#{SITE} > hitters.csv`
 CSV.open('pitchers.csv', headers: true, header_converters: :symbol).each { |row| @players << row.to_hash }
 CSV.open('hitters.csv', headers: true, header_converters: :symbol).each { |row| @players << row.to_hash }
-@draftkings = CSV.open('draftkings.csv', headers: true, header_converters: :downcase).map { |row| row.to_hash }
 @players = @players.select { |p| p[:salary].to_f > 0 }
 @players = @players.select { |p| INCLUDED_TEAMS.include?(p[:team]) } unless INCLUDED_TEAMS.empty?
+@players = @players.select { |p| !EXCLUDED_TEAMS.include?(p[:team]) } unless EXCLUDED_TEAMS.empty?
 @players = @players.sort_by { |p| p[:fpts].to_f }.reverse.take(250)
-@players.select { |p| p[:pos] != 'SP' }.group_by { |p| p[:team] }.each { |_, p| @stacks += p.combination(STACK_SIZE).to_a.sort_by { |s| s.inject(0) { |acc,p| acc += p[:fpts].to_f } }.reverse.take(10) }
+@players.select { |p| p[:pos] != @config[:pitcher] }.group_by { |p| p[:team] }.each { |_, p| @stacks += p.combination(STACK_SIZE).to_a.sort_by { |s| s.inject(0) { |acc,p| acc += p[:fpts].to_f } }.reverse.take(10) }
 @stacks = @stacks.sort_by { |s| s.inject(0) { |acc,p| acc += p[:fpts].to_f } }.reverse.take(75)
 @zero_stacks = @stacks.map { 0 }
 @zero_players = @players.map { 0 }
+
+def lookup_fanduel_id(team, position)
+  team.select { |p| p[:pos] == position }.map do |p|
+    fd = @salaries.find { |f| "#{f['first name']} #{f['last name']}" == p[:player] }
+    raise p.inspect unless fd
+    fd['id']
+  end
+end
+
+def lookup_draftkings_id(team, position)
+  team.select { |p| p[:pos] == position }.map do |p|
+    dk = @salaries.find { |f| f[' name'] == p[:player] }
+    raise p.inspect unless dk
+    dk[' id']
+  end
+end
 
 def create_new_lineup(lineups)
   problem = Rglpk::Problem.new
@@ -33,19 +58,19 @@ def create_new_lineup(lineups)
   end
 
   rows[5].name = 'P'
-  rows[5].set_bounds(Rglpk::GLP_FX, 2, 2)
-  matrix += @players.map { |p| p[:pos] == 'SP' ? 1 : 0 } + @zero_stacks.dup
+  rows[5].set_bounds(Rglpk::GLP_FX, @config[:num_pitchers], @config[:num_pitchers])
+  matrix += @players.map { |p| p[:pos] == @config[:pitcher] ? 1 : 0 } + @zero_stacks.dup
 
   rows[6].name = 'OF'
   rows[6].set_bounds(Rglpk::GLP_FX, 3, 3)
   matrix += @players.map { |p| p[:pos] == 'OF' ? 1 : 0 } + @zero_stacks.dup
 
   rows[7].name = 'Salary'
-  rows[7].set_bounds(Rglpk::GLP_DB, 0, 50000)
+  rows[7].set_bounds(Rglpk::GLP_DB, @config[:salary] - 500, @config[:salary])
   matrix += @players.map { |p| p[:salary].to_i } + @zero_stacks.dup
 
   rows[8].name = 'Team Size'
-  rows[8].set_bounds(Rglpk::GLP_FX, 10, 10)
+  rows[8].set_bounds(Rglpk::GLP_FX, @config[:team_size], @config[:team_size])
   matrix += @players.map { 1 } + @zero_stacks.dup
 
   rows = problem.add_rows(@stacks.count)
@@ -68,17 +93,24 @@ def create_new_lineup(lineups)
     rows = problem.add_rows(lineups.count)
     lineups.each_with_index do |lineup, i|
       rows[i].name = "Overlap #{i}"
-      rows[i].set_bounds(Rglpk::GLP_DB, 0, OVERLAP)
+      rows[i].set_bounds(Rglpk::GLP_DB, 0, STACK_OVERLAP)
       matrix += lineup + @zero_stacks.dup
+    end
+
+    rows = problem.add_rows(1)
+    rows[0].name = "Individual Overlap"
+    rows[0].set_bounds(Rglpk::GLP_DB, 0, INDIVIDUAL_OVERLAP)
+    @players.count.times do |i|
+      matrix << lineups.map { |lineup| lineup[i] }.inject(&:+)
     end
   end
 
-  pitchers = @players.select { |p| p[:pos] == 'SP' }
+  pitchers = @players.select { |p| p[:pos] == @config[:pitcher] }
   rows = problem.add_rows(pitchers.count)
   pitchers.each_with_index do |pitcher, i|
     rows[i].name = pitcher[:team]
     rows[i].set_bounds(Rglpk::GLP_DB, 0, 5)
-    matrix += @players.map { |p| p == pitcher ? 5 : (p[:position] != 'SP' && pitcher[:team] == p[:opp] ? 1 : 0) } + @zero_stacks.dup
+    matrix += @players.map { |p| p == pitcher ? 5 : (p[:position] != @config[:pitcher] && pitcher[:team] == p[:opp] ? 1 : 0) } + @zero_stacks.dup
   end
 
   cols = problem.add_cols(@players.count + @stacks.count)
@@ -112,30 +144,14 @@ NUM_LINEUPS.times do
   print_lineup(lineup, score)
 end
 
-def lookup_fanduel_id(team, position)
-  team.select { |p| p[:pos] == position }.map do |p|
-    fd = @fanduel.find { |f| "#{f['first name']} #{f['last name']}" == p[:player] }
-    raise p.inspect unless fd
-    fd['id']
-  end
-end
-
-def lookup_draftkings_id(team, position)
-  team.select { |p| p[:pos] == position }.map do |p|
-    dk = @draftkings.find { |f| f[' name'] == p[:player] }
-    raise p.inspect unless dk
-    dk[' id']
-  end
-end
-
 file = File.open('output.csv', 'w+')
-file << %w(P P C 1B 2B 3B SS OF OF OF).join(',')
+file << @config[:csv_header].join(',')
 file << "\n"
 lineups.each do |lineup|
   team = []
   lineup.each_with_index do |solution, i|
     team << @players[i] if solution == 1
   end
-  file << %w(SP C 1B 2B 3B SS OF).map { |pos| lookup_draftkings_id(team, pos) }.flatten.join(',')
+  file << @config[:id].call(team, @config[:pitcher]).flatten.join(',') + ',' + %w(C 1B 2B 3B SS OF).map { |pos| @config[:id].call(team, pos) }.flatten.join(',')
   file << "\n"
 end
