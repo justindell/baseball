@@ -1,30 +1,68 @@
 require 'rglpk'
 require 'csv'
+require 'mechanize'
 
 SITE = 'fanduel'
-NUM_LINEUPS = 5
+NUM_LINEUPS = 16
 STACK_SIZE = 4
-STACK_OVERLAP = 3
-INDIVIDUAL_OVERLAP = 3
+LINEUP_OVERLAP = 3
+INDIVIDUAL_OVERLAP = 8
 INCLUDED_TEAMS = %w()
-EXCLUDED_TEAMS = %w()
+EXCLUDED_TEAMS = %w(SFG ATL ARI CIN CHC LAD CHW SEA BOS KCR)
 
-SITE_MAP = { 'fanduel'    => { team_size: 9, num_pitchers: 1, pitcher: 'P', csv_header: %w(P C 1B 2B 3B SS OF OF OF), salary: 35000, id: lambda { |team, position| lookup_fanduel_id(team, position) } },
-             'draftkings' => { team_size: 10, num_pitchers: 2, pitcher: 'SP', csv_header: %w(P P C 1B 2B 3B SS OF OF OF) , salary: 50000, id: lambda { |team, position| lookup_draftkings_id(team, position) } } }
+SITE_MAP = { 'fanduel'    => { team_size: 9,
+                               max_stack: 4,
+                               num_pitchers: 1,
+                               pitcher: 'P',
+                               csv_header: %w(P C 1B 2B 3B SS OF OF OF),
+                               salary: 35000,
+                               id: lambda { |team, position| lookup_fanduel_id(team, position) } },
+             'draftkings' => { team_size: 10,
+                               max_stack: 5,
+                               num_pitchers: 2,
+                               pitcher: 'SP',
+                               csv_header: %w(P P C 1B 2B 3B SS OF OF OF) ,
+                               salary: 50000,
+                               id: lambda { |team, position| lookup_draftkings_id(team, position) } } }
 @players = []
 @stacks = []
 @config = SITE_MAP[SITE]
 @salaries = CSV.open(SITE + '.csv', headers: true, header_converters: :downcase).map { |row| row.to_hash }
-`curl --insecure https://rotogrinders.com/projected-stats/mlb-pitcher.csv?site=#{SITE} > pitchers.csv`
-`curl --insecure https://rotogrinders.com/projected-stats/mlb-hitter.csv?site=#{SITE} > hitters.csv`
-CSV.open('pitchers.csv', headers: true, header_converters: :symbol).each { |row| @players << row.to_hash }
-CSV.open('hitters.csv', headers: true, header_converters: :symbol).each { |row| @players << row.to_hash }
+
+def parse_csv body
+  CSV.parse(body, headers: true, header_converters: :symbol).each do |row|
+    fd = @salaries.find { |f| "#{f['first name']} #{f['last name']}" == row[:name] }
+    if fd
+      row = row.to_hash
+      row[:player] = row[:name]
+      row[:fpts] = row[:fanduel]
+      row[:salary] = fd['salary'].to_f
+      row[:team] = fd['team']
+      row[:opp] = fd['opponent']
+      row[:pos] = fd['position'] || 'P'
+      @players << row
+    end
+  end
+end
+
+agent = Mechanize.new
+
+form = agent.get('http://www.fangraphs.com/dailyprojections.aspx?pos=all&stats=pit&type=sabersim&team=0&lg=all&players=0').forms.first
+form['__EVENTTARGET'] = 'DFSBoard1$cmdCSV'
+form['__EVENTARGUMENT'] = ''
+parse_csv form.submit.body[3..-1]
+
+form = agent.get('http://www.fangraphs.com/dailyprojections.aspx?pos=all&stats=bat&type=sabersim&team=0&lg=all&players=0').forms.first
+form['__EVENTTARGET'] = 'DFSBoard1$cmdCSV'
+form['__EVENTARGUMENT'] = ''
+parse_csv form.submit.body[3..-1]
+
 @players = @players.select { |p| p[:salary].to_f > 0 }
 @players = @players.select { |p| INCLUDED_TEAMS.include?(p[:team]) } unless INCLUDED_TEAMS.empty?
 @players = @players.select { |p| !EXCLUDED_TEAMS.include?(p[:team]) } unless EXCLUDED_TEAMS.empty?
 @players = @players.sort_by { |p| p[:fpts].to_f }.reverse.take(250)
-@players.select { |p| p[:pos] != @config[:pitcher] }.group_by { |p| p[:team] }.each { |_, p| @stacks += p.combination(STACK_SIZE).to_a.sort_by { |s| s.inject(0) { |acc,p| acc += p[:fpts].to_f } }.reverse.take(10) }
-@stacks = @stacks.sort_by { |s| s.inject(0) { |acc,p| acc += p[:fpts].to_f } }.reverse.take(75)
+@players.select { |p| p[:pos] != @config[:pitcher] }.group_by { |p| p[:team] }.each { |_, p| @stacks += p.combination(STACK_SIZE).to_a.sort_by { |s| s.inject(0) { |acc,p| acc += p[:fpts].to_f } }.reverse.take(15) }
+@stacks = @stacks.sort_by { |s| s.inject(0) { |acc,p| acc += p[:fpts].to_f } }.reverse.take(120)
 @zero_stacks = @stacks.map { 0 }
 @zero_players = @players.map { 0 }
 
@@ -93,7 +131,7 @@ def create_new_lineup(lineups)
     rows = problem.add_rows(lineups.count)
     lineups.each_with_index do |lineup, i|
       rows[i].name = "Overlap #{i}"
-      rows[i].set_bounds(Rglpk::GLP_DB, 0, STACK_OVERLAP)
+      rows[i].set_bounds(Rglpk::GLP_DB, 0, LINEUP_OVERLAP)
       matrix += lineup + @zero_stacks.dup
     end
 
@@ -103,14 +141,15 @@ def create_new_lineup(lineups)
     @players.count.times do |i|
       matrix << lineups.map { |lineup| lineup[i] }.inject(&:+)
     end
+    matrix += @zero_stacks.dup
   end
 
   pitchers = @players.select { |p| p[:pos] == @config[:pitcher] }
   rows = problem.add_rows(pitchers.count)
   pitchers.each_with_index do |pitcher, i|
     rows[i].name = pitcher[:team]
-    rows[i].set_bounds(Rglpk::GLP_DB, 0, 5)
-    matrix += @players.map { |p| p == pitcher ? 5 : (p[:position] != @config[:pitcher] && pitcher[:team] == p[:opp] ? 1 : 0) } + @zero_stacks.dup
+    rows[i].set_bounds(Rglpk::GLP_DB, 0, @config[:max_stack])
+    matrix += @players.map { |p| p == pitcher ? @config[:max_stack] : (pitcher[:team] == p[:opp] ? 1 : 0) } + @zero_stacks.dup
   end
 
   cols = problem.add_cols(@players.count + @stacks.count)
