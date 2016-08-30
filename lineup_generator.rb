@@ -3,12 +3,12 @@ require 'csv'
 require 'mechanize'
 
 SITE = 'fanduel'
-NUM_LINEUPS = 16
+NUM_LINEUPS = 12
 STACK_SIZE = 4
-LINEUP_OVERLAP = 3
-INDIVIDUAL_OVERLAP = 8
+LINEUP_OVERLAP = 4
+INDIVIDUAL_OVERLAP = 5
 INCLUDED_TEAMS = %w()
-EXCLUDED_TEAMS = %w(SFG ATL ARI CIN CHC LAD CHW SEA BOS KCR)
+EXCLUDED_TEAMS = %w()
 
 SITE_MAP = { 'fanduel'    => { team_size: 9,
                                max_stack: 4,
