@@ -3,10 +3,10 @@ require 'csv'
 require 'mechanize'
 
 SITE = 'fanduel'
-NUM_LINEUPS = 12
+NUM_LINEUPS = 15
 STACK_SIZE = 4
 LINEUP_OVERLAP = 4
-INDIVIDUAL_OVERLAP = 5
+INDIVIDUAL_OVERLAP = 7
 INCLUDED_TEAMS = %w()
 EXCLUDED_TEAMS = %w()
 
@@ -29,16 +29,32 @@ SITE_MAP = { 'fanduel'    => { team_size: 9,
 @config = SITE_MAP[SITE]
 @salaries = CSV.open(SITE + '.csv', headers: true, header_converters: :downcase).map { |row| row.to_hash }
 
+def lookup_fanduel_id(team, position)
+  team.select { |p| p[:pos] == position }.map do |p|
+    fd = @salaries.find { |f| "#{f['first name']} #{f['last name']}" == p[:player] }
+    raise p.inspect unless fd
+    fd['id']
+  end
+end
+
+def lookup_draftkings_id(team, position)
+  team.select { |p| p[:pos] == position }.map do |p|
+    dk = @salaries.find { |f| f[' name'] == p[:player] }
+    raise p.inspect unless dk
+    dk[' id']
+  end
+end
+
 def parse_csv body
   CSV.parse(body, headers: true, header_converters: :symbol).each do |row|
     fd = @salaries.find { |f| "#{f['first name']} #{f['last name']}" == row[:name] }
     if fd
       row = row.to_hash
       row[:player] = row[:name]
-      row[:fpts] = row[:fanduel]
-      row[:salary] = fd['salary'].to_f
-      row[:team] = fd['team']
-      row[:opp] = fd['opponent']
+      row[:fpts] = row[SITE.to_sym]
+      row[:salary] = (fd['salary'] || fd[' salary']).to_f
+      row[:team] = fd['team'] || fd['teamabbrev '].upcase
+      row[:opp] = fd['opponent'] || fd['gameinfo'].split(' ').first.gsub(fd['teamabbrev '], '').gsub('@', '')
       row[:pos] = fd['position'] || 'P'
       @players << row
     end
@@ -65,22 +81,6 @@ parse_csv form.submit.body[3..-1]
 @stacks = @stacks.sort_by { |s| s.inject(0) { |acc,p| acc += p[:fpts].to_f } }.reverse.take(120)
 @zero_stacks = @stacks.map { 0 }
 @zero_players = @players.map { 0 }
-
-def lookup_fanduel_id(team, position)
-  team.select { |p| p[:pos] == position }.map do |p|
-    fd = @salaries.find { |f| "#{f['first name']} #{f['last name']}" == p[:player] }
-    raise p.inspect unless fd
-    fd['id']
-  end
-end
-
-def lookup_draftkings_id(team, position)
-  team.select { |p| p[:pos] == position }.map do |p|
-    dk = @salaries.find { |f| f[' name'] == p[:player] }
-    raise p.inspect unless dk
-    dk[' id']
-  end
-end
 
 def create_new_lineup(lineups)
   problem = Rglpk::Problem.new
