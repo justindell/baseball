@@ -51,6 +51,8 @@ days.each do |day|
   chart_data[day] += 1
 end
 
-g = Gchart.bar title: 'Potential Cubs Clinch Days', data: chart_data.sort.map(&:last), axis_with_labels: 'x', axis_labels: [chart_data.sort.map(&:first).map { |d| "#{d.month}/#{d.day}" }.join('|')], size: '800x300', bar_colors: '0E3386'
+chart_data = chart_data.sort.take(@games_day.count - 10)
+
+g = Gchart.bar title: 'Potential Cubs Clinch Days', data: chart_data.map(&:last), axis_with_labels: 'x', axis_labels: [chart_data.map(&:first).map { |d| "#{d.month}/#{d.day}" }.join('|')], size: '800x300', bar_colors: '0E3386'
 
 puts g.inspect
