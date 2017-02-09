@@ -47,7 +47,7 @@ end
 
 def parse_csv body
   CSV.parse(body, headers: true, header_converters: :symbol).each do |row|
-    fd = @salaries.find { |f| "#{f['first name']} #{f['last name']}" == row[:name] }
+    fd = SITE == 'fanduel' ? @salaries.find { |f| "#{f['first name']} #{f['last name']}" == row[:name] } :fd = @salaries.find { |f| f[' name'] == row[:name] }
     if fd
       row = row.to_hash
       row[:player] = row[:name]
@@ -57,6 +57,8 @@ def parse_csv body
       row[:opp] = fd['opponent'] || fd['gameinfo'].split(' ').first.gsub(fd['teamabbrev '], '').gsub('@', '')
       row[:pos] = fd['position'] || 'P'
       @players << row
+    else
+      puts "#{row[:team]}: couldn't find #{row[:name]}"
     end
   end
 end
@@ -157,6 +159,10 @@ def create_new_lineup(lineups)
     c.set_bounds(Rglpk::GLP_DB, 0, 1)
     c.kind = Rglpk::GLP_IV
   end
+
+  puts "matrix: #{matrix.count}"
+  puts "columns: #{@players.count + @zero_stacks.count}"
+  puts "rows: #{matrix.count / (@players.count + @zero_stacks.count)}"
 
   problem.obj.coefs = @players.map { |p| p[:fpts].to_f } + @zero_stacks.dup
 
