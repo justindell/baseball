@@ -2,11 +2,11 @@ require 'rglpk'
 require 'csv'
 require 'mechanize'
 
-SITE = 'fanduel'
-NUM_LINEUPS = 10
+SITE = 'draftkings'
+NUM_LINEUPS = 15
 STACK_SIZE = 4
-LINEUP_OVERLAP = 3
-INDIVIDUAL_OVERLAP = 4
+LINEUP_OVERLAP = 5
+INDIVIDUAL_OVERLAP = 11
 INCLUDED_TEAMS = %w()
 EXCLUDED_TEAMS = %w()
 
@@ -54,7 +54,7 @@ def parse_csv body
       row[:fpts] = row[SITE.to_sym]
       row[:salary] = (fd['salary'] || fd[' salary']).to_f
       row[:team] = fd['team'] || fd['teamabbrev '].upcase
-      row[:opp] = fd['opponent'] || fd['gameinfo'].split(' ').first.gsub(fd['teamabbrev '], '').gsub('@', '')
+      row[:opp] = (fd['opponent'] || fd['gameinfo'].split(' ').first.gsub(fd['teamabbrev '], '').gsub('@', '')).upcase
       row[:pos] = fd['position'] || 'P'
       @players << row
     else
@@ -175,10 +175,17 @@ end
 
 def print_lineup(lineup, score)
   puts
-  puts "SCORE: #{score}"
-  puts "POS\tSALARY\tTEAM\tOPP\tPOINTS\tPLAYER"
+  players = []
   lineup.each_with_index do |solution, i|
-    puts "#{@players[i][:pos]}\t#{@players[i][:salary]}\t#{@players[i][:team]}\t#{@players[i][:opp]}\t#{@players[i][:fpts]}\t#{@players[i][:player]}" if solution == 1
+    players << @players[i] if solution == 1
+  end
+  freq = players.inject(Hash.new(0)) { |h,v| h[v[:team]] += 1; h }
+  puts "STACK: #{players.max_by { |i| freq[i[:team]] }[:team]}"
+  puts "POS\tSALARY\tTEAM\tOPP\tPOINTS\tPLAYER"
+  %w(SP C 1B 2B 3B SS OF).map do |pos|
+    players.select { |p| p[:pos] == pos }.sort_by { |p| p[:player] }.each do |p|
+      puts "#{p[:pos]}\t#{p[:salary]}\t#{p[:team]}\t#{p[:opp]}\t#{p[:fpts]}\t#{p[:player]}"
+    end
   end
 end
 
