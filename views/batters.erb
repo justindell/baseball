@@ -3,9 +3,10 @@
     <thead>
       <th>Player</th>
       <th>Pos</th>
-      <th>Value</th>
-      <th>Dollars</th>
       <th>BP</th>
+      <th>Zips</th>
+      <th>Steamer</th>
+      <th>Median</th>
       <th>AB</th>
       <th>R</th>
       <th>HR</th>
@@ -13,14 +14,6 @@
       <th>SB</th>
       <th>AVG</th>
       <th>OBP</th>
-      <th>zR</th>
-      <th>zHR</th>
-      <th>zRBI</th>
-      <th>zSB</th>
-      <th>zAVG</th>
-      <th>zOBP</th>
-      <th>Yahoo</th>
-      <th>Current</th>
       <th></th>
     </thead>
     <tbody>
@@ -35,9 +28,10 @@
             <span class="player-name"><%= "#{idx + 1}. #{player[:name]}" %></span>
           </td>
           <td><a href="/batters?position=<%= player[:position] %>&limit=20"><%= player[:position] %></a></td>
-          <td><%= sprintf("%0.3f", player[:value]) %></td>
-          <td><%= sprintf("$%0.2f", player[:dollars]) %></td>
           <td><%= sprintf("$%0.2f", player[:bp_value]) %></td>
+          <td><%= sprintf("$%0.2f", player[:zips_value]) %></td>
+          <td><%= sprintf("$%0.2f", player[:steamer_value]) %></td>
+          <td><%= sprintf("$%0.2f", player[:median_value]) %></td>
           <td><%= sprintf("%d", player[:ab]) %></td>
           <td><%= sprintf("%d", player[:r]) %></td>
           <td><%= sprintf("%d", player[:hr]) %></td>
@@ -45,14 +39,6 @@
           <td><%= sprintf("%d", player[:sb]) %></td>
           <td><%= sprintf("%0.3f", player[:avg]) %></td>
           <td><%= sprintf("%0.3f", player[:obp]) %></td>
-          <td><%= sprintf("%0.3f", player[:r_val]) %></td>
-          <td><%= sprintf("%0.3f", player[:hr_val]) %></td>
-          <td><%= sprintf("%0.3f", player[:rbi_val]) %></td>
-          <td><%= sprintf("%0.3f", player[:sb_val]) %></td>
-          <td><%= sprintf("%0.3f", player[:avg_val]) %></td>
-          <td><%= sprintf("%0.3f", player[:obp_val]) %></td>
-          <td><%= sprintf("%0d", player[:yahoo_rank]) %></td>
-          <td><%= sprintf("%0d", player[:yahoo_current]) %></td>
           <td>
             <% unless player[:drafted] %>
               <form class= "draft" action="draft" method="post">
@@ -73,7 +59,7 @@
 <script>
   $(document).ready(function() {
     BASEBALL.initialize('batters');
-    $("#batters_table").tablesorter({sortList: [[4,1]]});
-    $('#batters_table > tbody > tr').heatcolor(function() { return $("td:nth-child(5)",this).text().replace('\$', ''); });
+    $("#batters_table").tablesorter({sortList: [[5,1]]});
+    $('#batters_table > tbody > tr').heatcolor(function() { return $("td:nth-child(6)",this).text().replace('\$', ''); });
   });
 </script>

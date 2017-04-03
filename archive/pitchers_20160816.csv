@@ -1,0 +1,31 @@
+player,salary,team,pos,opp,ceil,floor,fpts
+"Marco Estrada",9700,TOR,SP,NYY,,,18.09
+"Michael Pineda",7900,NYY,SP,TOR,,,15.72
+"Kenta Maeda",9500,LAD,SP,PHI,,,18.98
+"Vincent Velasquez",8000,PHI,SP,LAD,,,15.26
+"Eduardo Rodriguez",5700,BOS,SP,BAL,,,13.03
+"Yovani Gallardo",4200,BAL,SP,BOS,,,11.4
+"Jose Quintana",9200,CHW,SP,CLE,,,15.62
+"Corey Kluber",11400,CLE,SP,CHW,,,23.66
+"Edwin Jackson",5800,SDP,SP,TBR,,,14.19
+"Blake Snell",8700,TBR,SP,SDP,,,18.6
+"Jose Urena",4700,MIA,SP,CIN,,,11.36
+"Anthony DeSclafani",8200,CIN,SP,MIA,,,16.64
+"Danny Duffy",12700,KCR,SP,DET,,,20.17
+"Justin Verlander",12900,DET,SP,KCR,,,22.98
+"Ervin Santana",9000,MIN,SP,ATL,,,18.39
+"Joel De La Cruz",4000,ATL,SP,MIN,,,7.72
+"Chase Anderson",6100,MIL,SP,CHC,,,10.38
+"Jason Hammel",10200,CHC,SP,MIL,,,19.03
+"Andrew Triggs",4000,OAK,SP,TEX,,,9.37
+"Lucas Harrell",6000,TEX,SP,OAK,,,12.81
+"Jaime Garcia",9300,STL,SP,HOU,,,15.59
+"Dallas Keuchel",8400,HOU,SP,STL,,,17.42
+"Gio Gonzalez",5900,WAS,SP,COL,,,10.55
+"Chad Bettis",4500,COL,SP,WAS,,,11.84
+"Noah Syndergaard",11000,NYM,SP,ARI,,,19.25
+"Braden Shipley",7400,ARI,SP,NYM,,,13.09
+"Ariel Miranda",4000,SEA,SP,LAA,,,12.05
+"Jhoulys Chacin",4000,LAA,SP,SEA,,,10.21
+"Jameson Taillon",9100,PIT,SP,SFG,,,15.62
+"Jeff Samardzija",7600,SFG,SP,PIT,,,14.64

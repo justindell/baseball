@@ -4,7 +4,11 @@ require 'csv'
 require 'mechanize'
 require 'active_support/inflector'
 
-BP_FILE = 'pfmdata_08-16-2016_09-08-43.csv'
+BP_FILE = 'data/pfmdata_03-29-2017_09-15-24.csv'
+ZIPS_FILE = 'data/FanGraphs Leaderboard - Zips.csv'
+ZIPS_PITCHERS_FILE = 'data/FanGraphs Leaderboard - Zips Pitchers.csv'
+STEAMER_FILE = 'data/FanGraphs Leaderboard - Steamer.csv'
+STEAMER_PITCHERS_FILE = 'data/FanGraphs Leaderboard - Steamer Pitchers.csv'
 
 TEAMS = 12
 BUDGET = 260
@@ -12,8 +16,8 @@ DOLLAR_POOL = TEAMS * BUDGET
 PITCHERS_DRAFTED = 120
 BATTERS_DRAFTED = 180
 TOTAL_DRAFTED = PITCHERS_DRAFTED + BATTERS_DRAFTED
-YAHOO_LEAGUE_ID = 67272
-YAHOO_TEAM_ID = 5
+YAHOO_LEAGUE_ID = 34942
+YAHOO_TEAM_ID = 2
 YAHOO_FREE_AGENT_URL = "http://baseball.fantasysports.yahoo.com/b1/#{YAHOO_LEAGUE_ID}/players"
 YAHOO_MY_TEAM_URL = "http://baseball.fantasysports.yahoo.com/b1/#{YAHOO_LEAGUE_ID}/#{YAHOO_TEAM_ID}"
 YAHOO_LOGIN_URL = "http://login.yahoo.com/config/login"
@@ -79,9 +83,10 @@ DB.create_table :players do
   Decimal :qs_val
   Decimal :h_per_nine_val
   Decimal :bb_per_nine_val
-  Decimal :dollars
-  Decimal :value
   Decimal :bp_value, :default => 0
+  Decimal :zips_value, :default => 0
+  Decimal :steamer_value, :default => 0
+  Decimal :median_value, :default => 0
   Decimal :yahoo_rank, :default => 0
   Decimal :yahoo_current, :default => 0
   TrueClass :drafted, :default => false
@@ -115,7 +120,7 @@ end
 def parse_csv csv, position
   players = {}
   CSV.parse(csv, {:headers => true, :header_converters => :downcase}).each do |row|
-    player = {'value' => 0, 'position' => position.upcase}
+    player = { 'position' => position.upcase}
     categories = if position == 'p'
                    player['h_per_nine'] = (row['h'].to_f * 9) / row['ip'].to_f
                    player['bb_per_nine'] = (row['bb'].to_f * 9) / row['ip'].to_f
@@ -242,42 +247,59 @@ starting_pitchers = pitchers.select{|_,p| p['position'] == 'SP'}
 relief_pitchers = pitchers.select{|_,p| p['position'] == 'RP' && p['sv'] > 1}
 
 puts "calculating value"
-batters = batters.sort_by{|_,p| p['ab']}.reverse.take((batters.size * PLAY_TIME_THRESHOLD).ceil).to_h
-starting_pitchers = starting_pitchers.sort_by{|_,p| p['ip']}.reverse.take((starting_pitchers.size * PLAY_TIME_THRESHOLD).ceil).to_h
-BATTING_CATEGORIES.each { |stat| calculate batters, stat, BATTING_RATE_CATEGORIES }
-PITCHING_CATEGORIES.each { |stat| calculate starting_pitchers, stat, PITCHING_RATE_CATEGORIES }
-PITCHING_CATEGORIES.each { |stat| calculate relief_pitchers, stat, PITCHING_RATE_CATEGORIES }
-BATTING_RATE_CATEGORIES.each { |k,v| recalculate_rate batters, k, v }
-PITCHING_RATE_CATEGORIES.each { |k,v| recalculate_rate starting_pitchers, k, v }
-PITCHING_RATE_CATEGORIES.each { |k,v| recalculate_rate relief_pitchers, k, v }
+#batters = batters.sort_by{|_,p| p['ab']}.reverse.take((batters.size * PLAY_TIME_THRESHOLD).ceil).to_h
+#starting_pitchers = starting_pitchers.sort_by{|_,p| p['ip']}.reverse.take((starting_pitchers.size * PLAY_TIME_THRESHOLD).ceil).to_h
+#BATTING_CATEGORIES.each { |stat| calculate batters, stat, BATTING_RATE_CATEGORIES }
+#PITCHING_CATEGORIES.each { |stat| calculate starting_pitchers, stat, PITCHING_RATE_CATEGORIES }
+#PITCHING_CATEGORIES.each { |stat| calculate relief_pitchers, stat, PITCHING_RATE_CATEGORIES }
+#BATTING_RATE_CATEGORIES.each { |k,v| recalculate_rate batters, k, v }
+#PITCHING_RATE_CATEGORIES.each { |k,v| recalculate_rate starting_pitchers, k, v }
+#PITCHING_RATE_CATEGORIES.each { |k,v| recalculate_rate relief_pitchers, k, v }
 
 puts "calculating dollar values"
-calculate_dollar_value 'DH', batters.select{|_,p| p['position'] =~ /DH/}
-calculate_dollar_value 'C',  batters.select{|_,p| p['position'] =~ /C/}
-calculate_dollar_value '2B', batters.select{|_,p| p['position'] =~ /2B/}
-calculate_dollar_value 'SS', batters.select{|_,p| p['position'] =~ /SS/}
-calculate_dollar_value '3B', batters.select{|_,p| p['position'] =~ /3B/}
-calculate_dollar_value '1B', batters.select{|_,p| p['position'] =~ /1B/}
-calculate_dollar_value 'OF', batters.select{|_,p| p['position'] =~ /OF/}
-calculate_dollar_value 'SP', starting_pitchers
-calculate_dollar_value 'RP', relief_pitchers
+#calculate_dollar_value 'DH', batters.select{|_,p| p['position'] =~ /DH/}
+#calculate_dollar_value 'C',  batters.select{|_,p| p['position'] =~ /C/}
+#calculate_dollar_value '2B', batters.select{|_,p| p['position'] =~ /2B/}
+#calculate_dollar_value 'SS', batters.select{|_,p| p['position'] =~ /SS/}
+#calculate_dollar_value '3B', batters.select{|_,p| p['position'] =~ /3B/}
+#calculate_dollar_value '1B', batters.select{|_,p| p['position'] =~ /1B/}
+#calculate_dollar_value 'OF', batters.select{|_,p| p['position'] =~ /OF/}
+#calculate_dollar_value 'SP', starting_pitchers
+#calculate_dollar_value 'RP', relief_pitchers
 
 puts "adding baseball prospectus values"
 CSV.open(BP_FILE, headers: true, header_converters: [:downcase]).each do |player|
   name = "#{player['player'].split(',')[1]} #{player['player'].split(',')[0]}".strip
-  batters[name]['bp_value'] = player['$$$'].gsub('$', '') if batters[name]
-  starting_pitchers[name]['bp_value'] = player['$$$'].gsub('$', '') if starting_pitchers[name]
-  relief_pitchers[name]['bp_value'] = player['$$$'].gsub('$', '') if relief_pitchers[name]
+  batters[name]['bp_value'] = player['$$$'].gsub('$', '').gsub('(', '-').gsub(')', '').to_f if batters[name]
+  starting_pitchers[name]['bp_value'] = player['$$$'].gsub('$', '').gsub('(', '-').gsub(')', '').to_f if starting_pitchers[name]
+  relief_pitchers[name]['bp_value'] = player['$$$'].gsub('$', '').gsub('(', '-').gsub(')', '').to_f if relief_pitchers[name]
+end
+
+puts "adding zips values"
+CSV.open(ZIPS_FILE, headers: true, header_converters: [:downcase]).each do |player|
+  batters[player['playername']]['zips_value'] = player['dollars'].gsub('$', '').gsub('(', '-').gsub(')', '').to_f  if batters[player['playername']]
+end
+CSV.open(ZIPS_PITCHERS_FILE, headers: true, header_converters: [:downcase]).each do |player|
+  starting_pitchers[player['playername']]['zips_value'] = player['dollars'].gsub('$', '').gsub('(', '-').gsub(')', '').to_f if starting_pitchers[player['playername']]
+  relief_pitchers[player['playername']]['zips_value'] = player['dollars'].gsub('$', '').gsub('(', '-').gsub(')', '').to_f if relief_pitchers[player['playername']]
+end
+
+puts "adding steamer values"
+CSV.open(STEAMER_FILE, headers: true, header_converters: [:downcase]).each do |player|
+  batters[player['playername']]['steamer_value'] = player['dollars'].gsub('$', '').gsub('(', '-').gsub(')', '').to_f if batters[player['playername']]
+end
+CSV.open(STEAMER_PITCHERS_FILE, headers: true, header_converters: [:downcase]).each do |player|
+  starting_pitchers[player['playername']]['steamer_value'] = player['dollars'].gsub('$', '').gsub('(', '-').gsub(')', '').to_f if starting_pitchers[player['playername']]
+  relief_pitchers[player['playername']]['steamer_value'] = player['dollars'].gsub('$', '').gsub('(', '-').gsub(')', '').to_f if relief_pitchers[player['playername']]
 end
 
 puts "inserting players"
 batters.merge(starting_pitchers).merge(relief_pitchers).each do |name, player|
+  begin
   @players_table.insert(
     :name => name,
     :type => player['type'],
     :position => player['position'],
-    :value => player['value'],
-    :dollars => player['dollars'],
     :ab => player['ab'],
     :r => player['r'],
     :hr => player['hr'],
@@ -292,116 +314,80 @@ batters.merge(starting_pitchers).merge(relief_pitchers).each do |name, player|
     :h_per_nine => player['h_per_nine'],
     :bb_per_nine => player['bb_per_nine'],
     :qs => player['qs'],
-    :r_val => player['r_val'],
-    :hr_val => player['hr_val'],
-    :rbi_val => player['rbi_val'],
-    :sb_val => player['sb_val'],
-    :avg_val => player['avg_val'],
-    :obp_val => player['obp_val'],
-    :so_val => player['so_val'],
-    :sv_val => player['sv_val'],
-    :era_val => player['era_val'],
-    :h_per_nine_val => player['h_per_nine_val'],
-    :bb_per_nine_val => player['bb_per_nine_val'],
-    :qs_val => player['qs_val'],
     :bp_value => player['bp_value'] || 0,
-    :yahoo_rank => 0,
-    :yahoo_current => 0,
-    :drafted => true)
+    :zips_value => player['zips_value'] || 0,
+    :steamer_value => player['steamer_value'] || 0,
+    :median_value => [player['bp_value'] || 0, player['zips_value'] || 0, player['steamer_value'] || 0].sort[1],
+    :drafted => false)
+  rescue ArgumentError => e
+    puts player.inspect
+    raise e
+  end
 end
 
 puts "updating yahoo ranks"
-update_yahoo_ranks :batter
-update_yahoo_ranks :pitcher
+#update_yahoo_ranks :batter
+#update_yahoo_ranks :pitcher
 
 puts "getting free agents"
-free_agents = get_free_agents(:batter) + get_free_agents(:pitcher)
-free_agents.each { |p| @players_table.filter(:name => p).update(:drafted => false) }
+#free_agents = get_free_agents(:batter) + get_free_agents(:pitcher)
+#free_agents.each { |p| @players_table.filter(:name => p).update(:drafted => false) }
 
 puts "updating rookies"
-rookies = @agent.get(BASEBALL_REFERENCE_ROOKIES_URL)
-rookies.at('table#misc_batting').css('tbody tr').each do |rookie|
-  @players_table.filter(:name => rookie.css('td')[1].text).update(:rookie => true)
-end
-rookies.at('table#misc_pitching').css('tbody tr').each do |rookie|
-  @players_table.filter(:name => rookie.css('td')[1].text).update(:rookie => true)
-end
+#rookies = @agent.get(BASEBALL_REFERENCE_ROOKIES_URL)
+#rookies.at('table#misc_batting').css('tbody tr').each do |rookie|
+  #@players_table.filter(:name => rookie.css('td')[1].text).update(:rookie => true)
+#end
+#rookies.at('table#misc_pitching').css('tbody tr').each do |rookie|
+  #@players_table.filter(:name => rookie.css('td')[1].text).update(:rookie => true)
+#end
 
-puts "updating my team"
-team = @agent.get(YAHOO_MY_TEAM_URL)
-team.search('.ysf-player-name > a.name').map(&:text).each do |p|
-  @players_table.filter(:name => p).update(:mine => true)
-end
+#puts "updating my team"
+##team = @agent.get(YAHOO_MY_TEAM_URL)
+##team.search('.ysf-player-name > a.name').map(&:text).each do |p|
+  ##@players_table.filter(:name => p).update(:mine => true)
+##end
 
 puts "updating list of 12"
-@players_table.filter(:name => 'Corey Kluber').update(:list_of_twelve => true)
-@players_table.filter(:name => 'Dallas Keuchel').update(:list_of_twelve => true)
-@players_table.filter(:name => 'Sonny Gray').update(:list_of_twelve => true)
-@players_table.filter(:name => 'Carlos Carrasco').update(:list_of_twelve => true)
-@players_table.filter(:name => 'Chris Archer').update(:list_of_twelve => true)
-@players_table.filter(:name => 'Tyson Ross').update(:list_of_twelve => true)
-@players_table.filter(:name => 'Shelby Miller').update(:list_of_twelve => true)
-@players_table.filter(:name => 'Garrett Richards').update(:list_of_twelve => true)
-@players_table.filter(:name => 'Julio Teheran').update(:list_of_twelve => true)
-@players_table.filter(:name => 'Andrew Cashner').update(:list_of_twelve => true)
-@players_table.filter(:name => 'Nathan Eovaldi').update(:list_of_twelve => true)
-@players_table.filter(:name => 'Hector Santiago').update(:list_of_twelve => true)
-@players_table.filter(:name => 'Wily Peralta').update(:list_of_twelve => true)
-@players_table.filter(:name => 'Rich Hill').update(:list_of_twelve => true)
-@players_table.filter(:name => 'Jeff Locke').update(:list_of_twelve => true)
-@players_table.filter(:name => 'Tom Koehler').update(:list_of_twelve => true)
-@players_table.filter(:name => 'Josh Tomlin').update(:list_of_twelve => true)
-@players_table.filter(:name => 'Jesse Chavez').update(:list_of_twelve => true)
-@players_table.filter(:name => 'Miguel Gonzalez').update(:list_of_twelve => true)
+#@players_table.filter(:name => 'Corey Kluber').update(:list_of_twelve => true)
+#@players_table.filter(:name => 'Dallas Keuchel').update(:list_of_twelve => true)
+#@players_table.filter(:name => 'Sonny Gray').update(:list_of_twelve => true)
+#@players_table.filter(:name => 'Carlos Carrasco').update(:list_of_twelve => true)
+#@players_table.filter(:name => 'Chris Archer').update(:list_of_twelve => true)
+#@players_table.filter(:name => 'Tyson Ross').update(:list_of_twelve => true)
+#@players_table.filter(:name => 'Shelby Miller').update(:list_of_twelve => true)
+#@players_table.filter(:name => 'Garrett Richards').update(:list_of_twelve => true)
+#@players_table.filter(:name => 'Julio Teheran').update(:list_of_twelve => true)
+#@players_table.filter(:name => 'Andrew Cashner').update(:list_of_twelve => true)
+#@players_table.filter(:name => 'Nathan Eovaldi').update(:list_of_twelve => true)
+#@players_table.filter(:name => 'Hector Santiago').update(:list_of_twelve => true)
+#@players_table.filter(:name => 'Wily Peralta').update(:list_of_twelve => true)
+#@players_table.filter(:name => 'Rich Hill').update(:list_of_twelve => true)
+#@players_table.filter(:name => 'Jeff Locke').update(:list_of_twelve => true)
+#@players_table.filter(:name => 'Tom Koehler').update(:list_of_twelve => true)
+#@players_table.filter(:name => 'Josh Tomlin').update(:list_of_twelve => true)
+#@players_table.filter(:name => 'Jesse Chavez').update(:list_of_twelve => true)
+#@players_table.filter(:name => 'Miguel Gonzalez').update(:list_of_twelve => true)
 
 puts 'updating prospects'
-@players_table.filter(:name => 'Corey Seager').update(:prospect => true)
-@players_table.filter(:name => 'Byron Buxton').update(:prospect => true)
-@players_table.filter(:name => 'Yoan Moncada').update(:prospect => true)
-@players_table.filter(:name => 'Julio Urias').update(:prospect => true)
-@players_table.filter(:name => 'Lucas Giolito').update(:prospect => true)
-@players_table.filter(:name => 'J.P. Crawford').update(:prospect => true)
-@players_table.filter(:name => 'Alex Reyes').update(:prospect => true)
-@players_table.filter(:name => 'Orlando Arcia').update(:prospect => true)
-@players_table.filter(:name => 'Trea Turner').update(:prospect => true)
-@players_table.filter(:name => 'Joey Gallo').update(:prospect => true)
-@players_table.filter(:name => 'A.J. Reed').update(:prospect => true)
-@players_table.filter(:name => 'Blake Snell').update(:prospect => true)
-@players_table.filter(:name => 'Steven Matz').update(:prospect => true)
-@players_table.filter(:name => 'Tyler Glasnow').update(:prospect => true)
-@players_table.filter(:name => 'Andrew Benintendi').update(:prospect => true)
-@players_table.filter(:name => 'Lewis Brinson').update(:prospect => true)
-@players_table.filter(:name => 'Dansby Swanson').update(:prospect => true)
-@players_table.filter(:name => 'Rafael Devers').update(:prospect => true)
-@players_table.filter(:name => 'Anderson Espinoza').update(:prospect => true)
-@players_table.filter(:name => 'Francis Martes').update(:prospect => true)
-@players_table.filter(:name => 'Nomar Mazara').update(:prospect => true)
 @players_table.filter(:name => 'Austin Meadows').update(:prospect => true)
-@players_table.filter(:name => 'Jose De Leon').update(:prospect => true)
-@players_table.filter(:name => 'Sean Newcomb').update(:prospect => true)
-@players_table.filter(:name => 'Anthony Alford of').update(:prospect => true)
-@players_table.filter(:name => 'Jorge Mateo').update(:prospect => true)
-@players_table.filter(:name => 'Nick Williams').update(:prospect => true)
-@players_table.filter(:name => 'Jose Berrios').update(:prospect => true)
-@players_table.filter(:name => 'Raul A. Mondesi').update(:prospect => true)
-@players_table.filter(:name => 'Max Kepler').update(:prospect => true)
-@players_table.filter(:name => 'Bradley Zimmer').update(:prospect => true)
-@players_table.filter(:name => 'Robert Stephenson').update(:prospect => true)
-@players_table.filter(:name => 'Victor Robles').update(:prospect => true)
-@players_table.filter(:name => 'Cody Reed').update(:prospect => true)
-@players_table.filter(:name => 'Franklin Barreto ss').update(:prospect => true)
-@players_table.filter(:name => 'Gary Sanchez').update(:prospect => true)
-@players_table.filter(:name => 'Jon Gray').update(:prospect => true)
-@players_table.filter(:name => 'Josh Bell').update(:prospect => true)
-@players_table.filter(:name => 'David Dahl').update(:prospect => true)
-@players_table.filter(:name => 'Brendan Rodgers').update(:prospect => true)
-@players_table.filter(:name => 'Gleyber Torres').update(:prospect => true)
-@players_table.filter(:name => 'Alex Bregman').update(:prospect => true)
-@players_table.filter(:name => 'Ryan McMahon').update(:prospect => true)
+@players_table.filter(:name => 'Manuel Margot').update(:prospect => true)
+@players_table.filter(:name => 'Trey Mancini').update(:prospect => true)
+@players_table.filter(:name => 'Ozzie Albies').update(:prospect => true)
+@players_table.filter(:name => 'Tyler Glasnow').update(:prospect => true)
 @players_table.filter(:name => 'Clint Frazier').update(:prospect => true)
-@players_table.filter(:name => 'Tim Anderson').update(:prospect => true)
-@players_table.filter(:name => 'Willy Adames').update(:prospect => true)
-@players_table.filter(:name => 'Michael Fulmer').update(:prospect => true)
-@players_table.filter(:name => 'Sean Manaea').update(:prospect => true)
-@players_table.filter(:name => 'Trent Clark').update(:prospect => true)
-@players_table.filter(:name => 'Kenta Maeda').update(:prospect => true)
+@players_table.filter(:name => 'J.P. Crawford').update(:prospect => true)
+@players_table.filter(:name => 'Josh Bell').update(:prospect => true)
+@players_table.filter(:name => 'Robert Gsellman').update(:prospect => true)
+@players_table.filter(:name => 'Lucas Giolito').update(:prospect => true)
+@players_table.filter(:name => 'Yulieski Gurriel').update(:prospect => true)
+@players_table.filter(:name => 'Jose De Leon').update(:prospect => true)
+@players_table.filter(:name => 'Reynaldo Lopez').update(:prospect => true)
+@players_table.filter(:name => 'Francis Martes').update(:prospect => true)
+@players_table.filter(:name => 'Lewis Brinson').update(:prospect => true)
+@players_table.filter(:name => 'Mitch Haniger').update(:prospect => true)
+@players_table.filter(:name => 'Jharel Cotton').update(:prospect => true)
+@players_table.filter(:name => 'Amed Rosario').update(:prospect => true)
+@players_table.filter(:name => 'Yoan Moncada').update(:prospect => true)
+@players_table.filter(:name => 'Dansby Swanson').update(:prospect => true)
+@players_table.filter(:name => 'Andrew Benintendi').update(:prospect => true)

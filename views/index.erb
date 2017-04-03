@@ -3,11 +3,10 @@
     <thead>
       <th>Player</th>
       <th>Position</th>
-      <th>Value</th>
-      <th>Dollars</th>
       <th>BP</th>
-      <th>Yahoo</th>
-      <th>Current</th>
+      <th>Zips</th>
+      <th>Steamer</th>
+      <th>Median</th>
       <th></th>
     </thead>
     <tbody>
@@ -21,11 +20,10 @@
             <%= "#{idx + 1}. #{player[:name]}" %>
           </td>
           <td><%= player[:position] %></td>
-          <td><%= sprintf("%0.3f", player[:value]) %></td>
-          <td><%= sprintf("$%0.2f", player[:dollars]) %></td>
           <td><%= sprintf("$%0.2f", player[:bp_value]) %></td>
-          <td><%= sprintf("%0d", player[:yahoo_rank]) %></td>
-          <td><%= sprintf("%0d", player[:yahoo_current]) %></td>
+          <td><%= sprintf("$%0.2f", player[:zips_value]) %></td>
+          <td><%= sprintf("$%0.2f", player[:steamer_value]) %></td>
+          <td><%= sprintf("$%0.2f", player[:median_value]) %></td>
           <td>
             <% unless player[:drafted] %>
               <form class= "draft" action="draft" method="post">
@@ -40,8 +38,8 @@
   </table>
   <script>
     $(document).ready(function() {
-      $("#players_table").tablesorter({sortList: [[4,1]]});
-      $('#players_table > tbody > tr').heatcolor(function() { return $("td:nth-child(5)",this).text().replace('\$', ''); });
+      $("#players_table").tablesorter({sortList: [[5,1]]});
+      $('#players_table > tbody > tr').heatcolor(function() { return $("td:nth-child(6)",this).text().replace('\$', ''); });
     });
   </script>
 </div>
