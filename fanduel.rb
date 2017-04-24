@@ -6,8 +6,11 @@ require 'optparse'
 require 'sequel'
 
 CSV_HEADER = %w(P C 1B 2B 3B SS OF OF OF)
-STACK_SIZE = 4
+STACK_SIZE = 3
+TEAM_MAX = 4
+MAX_BAT_ORDER = 6
 MAX_SALARY = 35000
+EXCLUDE_TEAMS = %w()
 DB = Sequel.connect("postgres://cfbdfs:#{ENV['CFBDFS_DATABASE_PASSWORD']}@54.69.133.42:5432/cbbdfs?search_path=mlb")
 
 @config = { num_lineups: 25, lineup_overlap: 4, individual_overlap: 15, min_salary: MAX_SALARY - 500 }
@@ -16,49 +19,64 @@ def translate_fanduel_name(salary)
   name = salary['nickname'].downcase.gsub('jr.', '').gsub('sr.', '').strip
   return 'gregory bird' if name == 'greg bird'
   return 'steve souza' if name == 'steven souza'
+  return 'michael fiers' if name == 'mike fiers'
+  return 'timothy anderson' if name == 'tim anderson'
+  return 'hyun-soo kim' if name == 'hyun soo kim'
+  return 'yulieski gurriel' if name == 'yuli gurriel'
+  return 'manuel pina' if name == 'manny pina'
   name
 end
 
 def get_salaries(filename)
   salaries = []
   CSV.open(filename, headers: true, header_converters: :downcase).each do |row|
-    next if row[:injury_indicator] == 'DL'
+    next if row['injury_indicator'] == 'DL'
+    next if EXCLUDE_TEAMS.include?(row['team'])
     salaries << row.to_h
   end
   salaries
 end
 
 def get_nathan_players(salaries)
-  players = DB[:projections].all
-  players.each do |player|
-    salary = salaries.find { |salary| translate_fanduel_name(salary) == player[:player_name].downcase }
-    if salary
-      player[:salary] = salary['salary']
+  players = DB[:projections].where(game_date: Date.today).all
+  salaries.each do |salary|
+    player = players.find { |player| translate_fanduel_name(salary) == player[:player_name].downcase }
+    if player
+      player[:salary] = salary['salary'].to_i
       player[:team] = salary['team']
       player[:opponent] = salary['opponent']
       player[:position] = salary['position']
       player[:id] = salary['id']
-      player[:fdpts] = player[:fdpts].to_f
-    elsif @config[:debug]
-      puts "could not find salary for #{player[:player_name]}"
+      player[:fanduel_points] = player[:fanduel_points].to_f
+    elsif @config[:debug] && salary['batting order'] != '0' && salary['batting order'] != ''
+      puts "could not find salary for #{salary['nickname']}"
     end
   end
-  players.delete_if { |p| p[:salary].nil? }
+  players.delete_if { |p| p[:salary].nil? || (p[:position] != 'P' && p[:bat_order] > MAX_BAT_ORDER) } # TODO: keep lower bats if high value?
 end
 
 def get_dfn_players(salaries)
-  [].tap do |players|
-    Dir[@config[:daily_fantasy_nerd] + '/DFN*'].each do |file|
-      CSV.open(file, headers: true, header_converters: :downcase).each do |row|
-        salary = salaries.find { |salary| translate_fanduel_name(salary) == row['player name'].downcase }
-        if salary
-          players << { player_name: row['player name'], salary: salary['salary'], team: salary['team'], opponent: salary['opponent'], position: salary['position'], id: salary['id'], fdpts: row['proj fp'].to_f }
-        elsif @config[:debug]
-          puts "could not find salary for #{row['player name']}"
-        end
-      end
+  rows, players = [], []
+  Dir[@config[:daily_fantasy_nerd] + '/DFN*'].each do |file|
+    CSV.open(file, headers: true, header_converters: :downcase).each { |row| rows << row }
+  end
+  salaries.each do |salary|
+    salary['nickname'] = 'Nick Castellanos' if salary['nickname'] == 'Nicholas Castellanos'
+    player = rows.find { |row| salary['nickname'].downcase.gsub(' jr.', '') == row['player name'].downcase }
+    if player
+      players << { player_name: player['player name'],
+                   salary: salary['salary'],
+                   team: salary['team'],
+                   opponent: salary['opponent'],
+                   position: salary['position'],
+                   id: salary['id'],
+                   bat_order: salary['batting order'].to_i,
+                   fanduel_points: player['proj fp'].to_f }
+    elsif @config[:debug] && salary['batting order'] != '0' && salary['batting order'] != ''
+      puts "could not find projection for #{salary['nickname']}"
     end
   end
+  players.delete_if { |p| p[:salary].nil? || (p[:position] != 'P' && p[:bat_order] > MAX_BAT_ORDER) } # TODO: keep lower bats if high value?
 end
 
 def get_players(salaries)
@@ -71,14 +89,15 @@ end
 
 def get_stacks(players)
   stacks = []
-  players.select { |p| p[:position] != 'P' }.group_by { |p| p[:team] }.each { |_, p| stacks += p.combination(STACK_SIZE).to_a.sort_by { |s| s.inject(0) { |acc,p| acc += p[:fdpts] } }.reverse.take(10) }
-  stacks.sort_by { |s| s.inject(0) { |acc,p| acc += p[:fdpts].to_f } }.reverse.take(150)
+  players.select { |p| p[:position] != 'P' }.group_by { |p| p[:team] }.each { |_, p| stacks += p.combination(STACK_SIZE).to_a.sort_by { |s| s.inject(0) { |acc,p| acc += p[:fanduel_points] } }.reverse.take(5) }
+  stacks.sort_by { |s| s.inject(0) { |acc,p| acc += p[:fanduel_points].to_f } }.reverse.take(100)
 end
 
 def create_new_lineup(lineups, players, stacks)
   problem = Rglpk::Problem.new
   problem.name = 'optimal lineup generator'
   problem.obj.dir = Rglpk::GLP_MAX
+  pitchers = players.select { |p| p[:position] == 'P' }
   matrix = []
 
   rows = problem.add_rows(8)
@@ -106,9 +125,23 @@ def create_new_lineup(lineups, players, stacks)
   end
 
   rows = problem.add_rows(1)
-  rows[0].name = "One Stack"
-  rows[0].set_bounds(Rglpk::GLP_FX, 1, 1)
+  rows[0].name = "Two Stacks"
+  rows[0].set_bounds(Rglpk::GLP_FX, 2, 2)
   matrix += Array.new(players.count, 0) + stacks.map { 1 }
+
+  rows = problem.add_rows(pitchers.count)
+  pitchers.each_with_index do |pitcher, i|
+    rows[i].name = "#{pitcher[:team]} Maximum"
+    rows[i].set_bounds(Rglpk::GLP_DB, 0, TEAM_MAX)
+    matrix += players.map { |p| (pitcher[:team] == p[:team] ? 1 : 0) } + Array.new(stacks.count, 0)
+  end
+
+  rows = problem.add_rows(pitchers.count)
+  pitchers.each_with_index do |pitcher, i|
+    rows[i].name = "Pitcher vs #{pitcher[:team]}"
+    rows[i].set_bounds(Rglpk::GLP_DB, 0, STACK_SIZE)
+    matrix += players.map { |p| p == pitcher ? STACK_SIZE : (pitcher[:team] == p[:opponent] ? 1 : 0) } + Array.new(stacks.count, 0)
+  end
 
   if lineups.count > 0
     rows = problem.add_rows(lineups.count)
@@ -127,14 +160,6 @@ def create_new_lineup(lineups, players, stacks)
     matrix += Array.new(stacks.count, 0)
   end
 
-  pitchers = players.select { |p| p[:position] == 'P' }
-  rows = problem.add_rows(pitchers.count)
-  pitchers.each_with_index do |pitcher, i|
-    rows[i].name = "Pitcher vs #{pitcher[:team]}"
-    rows[i].set_bounds(Rglpk::GLP_DB, 0, STACK_SIZE)
-    matrix += players.map { |p| p == pitcher ? STACK_SIZE : (pitcher[:team] == p[:opponent] ? 1 : 0) } + Array.new(stacks.count, 0)
-  end
-
   cols = problem.add_cols(players.count + stacks.count)
   cols.each do |c|
     c.set_bounds(Rglpk::GLP_DB, 0, 1)
@@ -147,7 +172,7 @@ def create_new_lineup(lineups, players, stacks)
     puts "rows: #{matrix.count / (players.count + stacks.count)}"
   end
 
-  problem.obj.coefs = players.map { |p| p[:fdpts] } + Array.new(stacks.count, 0)
+  problem.obj.coefs = players.map { |p| p[:fanduel_points] } + Array.new(stacks.count, 0)
   problem.set_matrix(matrix)
   problem.mip(presolve: Rglpk::GLP_ON)
   score = problem.obj.mip
@@ -164,11 +189,11 @@ def print_lineup(lineup, score, players)
   team = solution_to_team(lineup, players)
   freq = team.inject(Hash.new(0)) { |h,v| h[v[:team]] += 1; h }
   puts
-  puts "STACK: #{team.max_by { |i| freq[i[:team]] }[:team]}" if @config[:debug]
+  puts "STACKS: #{freq.select { |t,v| v > 2 }.keys.join(', ')}  TOTAL: #{team.inject(0) { |a, p| a + p[:fanduel_points] }}" if @config[:debug]
   puts "POS\tSALARY\tTEAM\tOPP\tPOINTS\tPLAYER"
   %w(P C 1B 2B 3B SS OF).map do |pos|
     team.select { |p| p[:position] == pos }.sort_by { |p| p[:player_name] }.each do |p|
-      puts "#{p[:position]}\t#{p[:salary]}\t#{p[:team]}\t#{p[:opponent]}\t#{p[:fdpts].round(2)}\t#{p[:player_name]}"
+      puts "#{p[:position]}\t#{p[:salary]}\t#{p[:team]}\t#{p[:opponent]}\t#{p[:fanduel_points].round(2)}\t#{p[:player_name]}"
     end
   end
 end
