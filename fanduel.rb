@@ -9,14 +9,16 @@ CSV_HEADER = %w(P C 1B 2B 3B SS OF OF OF)
 STACK_SIZE = 3
 TEAM_MAX = 4
 MAX_BAT_ORDER = 6
-MAX_SALARY = 35000
+FANDUEL_MAX_SALARY = 35000
+YAHOO_MAX_SALARY = 200
 EXCLUDE_TEAMS = %w()
 DB = Sequel.connect("postgres://cfbdfs:#{ENV['CFBDFS_DATABASE_PASSWORD']}@54.69.133.42:5432/cbbdfs?search_path=mlb")
 
-@config = { num_lineups: 25, lineup_overlap: 4, individual_overlap: 15, min_salary: MAX_SALARY - 500 }
+@config = { num_lineups: 25, lineup_overlap: 4, individual_overlap: 15 }
 
-def translate_fanduel_name(salary)
-  name = salary['nickname'].downcase.gsub('jr.', '').gsub('sr.', '').strip
+def translate_name(salary)
+  name = @config[:yahoo] ? "#{salary['first name']} #{salary['last name']}" : salary['nickname']
+  name = name.downcase.gsub('jr.', '').gsub('sr.', '').strip
   return 'gregory bird' if name == 'greg bird'
   return 'steve souza' if name == 'steven souza'
   return 'michael fiers' if name == 'mike fiers'
@@ -27,7 +29,7 @@ def translate_fanduel_name(salary)
   name
 end
 
-def get_salaries(filename)
+def get_fanduel_salaries(filename)
   salaries = []
   CSV.open(filename, headers: true, header_converters: :downcase).each do |row|
     next if row['injury_indicator'] == 'DL'
@@ -37,19 +39,38 @@ def get_salaries(filename)
   salaries
 end
 
+def get_yahoo_salaries(filename)
+  salaries = []
+  salaries = []
+  CSV.open(filename, headers: true, header_converters: :downcase).each do |row|
+    next if row['injury_indicator'] =~ /DL/
+    next if EXCLUDE_TEAMS.include?(row['team'])
+    salaries << row.to_h
+  end
+  salaries
+end
+
+def get_salaries(filename)
+  if @config[:yahoo]
+    get_yahoo_salaries(filename)
+  else
+    get_fanduel_salaries(filename)
+  end
+end
+
 def get_nathan_players(salaries)
   players = DB[:projections].where(game_date: Date.today).all
   salaries.each do |salary|
-    player = players.find { |player| translate_fanduel_name(salary) == player[:player_name].downcase }
+    player = players.find { |player| translate_name(salary) == player[:player_name].downcase }
     if player
       player[:salary] = salary['salary'].to_i
       player[:team] = salary['team']
       player[:opponent] = salary['opponent']
       player[:position] = salary['position']
       player[:id] = salary['id']
-      player[:fanduel_points] = player[:fanduel_points].to_f
+      player[:fpts] = player[:fanduel_points].to_f
     elsif @config[:debug] && salary['batting order'] != '0' && salary['batting order'] != ''
-      puts "could not find salary for #{salary['nickname']}"
+      puts "could not find salary for " + (salary['nickname'] || "#{salary['first name']} #{salary['last name']}")
     end
   end
   players.delete_if { |p| p[:salary].nil? || (p[:position] != 'P' && p[:bat_order] > MAX_BAT_ORDER) } # TODO: keep lower bats if high value?
@@ -71,7 +92,7 @@ def get_dfn_players(salaries)
                    position: salary['position'],
                    id: salary['id'],
                    bat_order: salary['batting order'].to_i,
-                   fanduel_points: player['proj fp'].to_f }
+                   fpts: player['proj fp'].to_f }
     elsif @config[:debug] && salary['batting order'] != '0' && salary['batting order'] != ''
       puts "could not find projection for #{salary['nickname']}"
     end
@@ -89,8 +110,8 @@ end
 
 def get_stacks(players)
   stacks = []
-  players.select { |p| p[:position] != 'P' }.group_by { |p| p[:team] }.each { |_, p| stacks += p.combination(STACK_SIZE).to_a.sort_by { |s| s.inject(0) { |acc,p| acc += p[:fanduel_points] } }.reverse.take(5) }
-  stacks.sort_by { |s| s.inject(0) { |acc,p| acc += p[:fanduel_points].to_f } }.reverse.take(100)
+  players.select { |p| p[:position] != 'P' }.group_by { |p| p[:team] }.each { |_, p| stacks += p.combination(STACK_SIZE).to_a.sort_by { |s| s.inject(0) { |acc,p| acc += p[:fpts] } }.reverse.take(5) }
+  stacks.sort_by { |s| s.inject(0) { |acc,p| acc += p[:fpts].to_f } }.reverse.take(100)
 end
 
 def create_new_lineup(lineups, players, stacks)
@@ -101,16 +122,20 @@ def create_new_lineup(lineups, players, stacks)
   matrix = []
 
   rows = problem.add_rows(8)
-  %w(P C 1B 2B 3B SS).each_with_index do |position, i|
+  %w(C 1B 2B 3B SS).each_with_index do |position, i|
     rows[i].name = position
     rows[i].set_bounds(Rglpk::GLP_FX, 1, 1)
     matrix += players.map { |p| p[:position] == position ? 1 : 0 } + Array.new(stacks.count, 0)
   end
+  num_pitchers = @config[:yahoo] ? 2 : 1
+  rows[5].name = 'P'
+  rows[5].set_bounds(Rglpk::GLP_FX, num_pitchers, num_pitchers)
+  matrix += players.map { |p| p[:position] == 'P' ? 1 : 0 } + Array.new(stacks.count, 0)
   rows[6].name = 'OF'
   rows[6].set_bounds(Rglpk::GLP_FX, 3, 3)
   matrix += players.map { |p| p[:position] == 'OF' ? 1 : 0 } + Array.new(stacks.count, 0)
   rows[7].name = 'Salary'
-  rows[7].set_bounds(Rglpk::GLP_DB, @config[:min_salary], MAX_SALARY)
+  rows[7].set_bounds(Rglpk::GLP_DB, @config[:min_salary], @config[:yahoo] ? YAHOO_MAX_SALARY : FANDUEL_MAX_SALARY)
   matrix += players.map { |p| p[:salary].to_i } + Array.new(stacks.count, 0)
 
   rows = problem.add_rows(stacks.count)
@@ -172,7 +197,7 @@ def create_new_lineup(lineups, players, stacks)
     puts "rows: #{matrix.count / (players.count + stacks.count)}"
   end
 
-  problem.obj.coefs = players.map { |p| p[:fanduel_points] } + Array.new(stacks.count, 0)
+  problem.obj.coefs = players.map { |p| p[:fpts] } + Array.new(stacks.count, 0)
   problem.set_matrix(matrix)
   problem.mip(presolve: Rglpk::GLP_ON)
   score = problem.obj.mip
@@ -189,11 +214,11 @@ def print_lineup(lineup, score, players)
   team = solution_to_team(lineup, players)
   freq = team.inject(Hash.new(0)) { |h,v| h[v[:team]] += 1; h }
   puts
-  puts "STACKS: #{freq.select { |t,v| v > 2 }.keys.join(', ')}  TOTAL: #{team.inject(0) { |a, p| a + p[:fanduel_points] }}" if @config[:debug]
+  puts "STACKS: #{freq.select { |t,v| v > 2 }.keys.join(', ')}  TOTAL: #{team.inject(0) { |a, p| a + p[:fpts] }}" if @config[:debug]
   puts "POS\tSALARY\tTEAM\tOPP\tPOINTS\tPLAYER"
   %w(P C 1B 2B 3B SS OF).map do |pos|
     team.select { |p| p[:position] == pos }.sort_by { |p| p[:player_name] }.each do |p|
-      puts "#{p[:position]}\t#{p[:salary]}\t#{p[:team]}\t#{p[:opponent]}\t#{p[:fanduel_points].round(2)}\t#{p[:player_name]}"
+      puts "#{p[:position]}\t#{p[:salary]}\t#{p[:team]}\t#{p[:opponent]}\t#{p[:fpts].round(2)}\t#{p[:player_name]}"
     end
   end
 end
@@ -218,9 +243,12 @@ if __FILE__ == $0
     opts.on('-i=x', '--individual-overlap=x', Integer) { |val| @config[:individual_overlap] = val }
     opts.on('-m=x', '--minimum-salary=x', Integer)     { |val| @config[:min_salary] = val }
     opts.on('-d=x', '--daily-fantasy-nerd=x')          { |val| @config[:daily_fantasy_nerd] = val }
+    opts.on('-y',   '--yahoo')                         { |val| @config[:yahoo] = true }
     opts.on('--debug')                                 { |val| @config[:debug] = val }
     opts.parse!
   end
+
+  @config[:min_salary] ||= @config[:yahoo] ? YAHOO_MAX_SALARY - 5 : FANDUEL_MAX_SALARY - 500
 
   salaries = get_salaries(ARGV.shift)
   players = get_players(salaries)
