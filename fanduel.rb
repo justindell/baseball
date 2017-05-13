@@ -4,6 +4,7 @@ require 'rglpk'
 require 'csv'
 require 'optparse'
 require 'sequel'
+require 'mechanize'
 
 CSV_HEADER = %w(P C 1B 2B 3B SS OF OF OF)
 STACK_SIZE = 3
@@ -73,7 +74,7 @@ def get_nathan_players(salaries)
       puts "could not find salary for " + (salary['nickname'] || "#{salary['first name']} #{salary['last name']}")
     end
   end
-  players.delete_if { |p| p[:salary].nil? || (p[:position] != 'P' && p[:bat_order] > MAX_BAT_ORDER) } # TODO: keep lower bats if high value?
+  players.delete_if { |p| p[:salary].nil? || (p[:position] != 'P' && p[:bat_order] > MAX_BAT_ORDER) }
 end
 
 def get_dfn_players(salaries)
@@ -97,12 +98,46 @@ def get_dfn_players(salaries)
       puts "could not find projection for #{salary['nickname']}"
     end
   end
-  players.delete_if { |p| p[:salary].nil? || (p[:position] != 'P' && p[:bat_order] > MAX_BAT_ORDER) } # TODO: keep lower bats if high value?
+  players.delete_if { |p| p[:salary].nil? || (p[:position] != 'P' && p[:bat_order] > MAX_BAT_ORDER) }
+end
+
+def get_fangraphs_players(salaries)
+  rows, players = [], []
+  agent = Mechanize.new
+
+  form = agent.get('http://www.fangraphs.com/dailyprojections.aspx?pos=all&stats=pit&type=sabersim&team=0&lg=all&players=0').forms.first
+  form['__EVENTTARGET'] = 'DFSBoard1$cmdCSV'
+  form['__EVENTARGUMENT'] = ''
+  CSV.parse(form.submit.body[3..-1], headers: true, header_converters: :downcase).each { |row| rows << row }
+
+  form = agent.get('http://www.fangraphs.com/dailyprojections.aspx?pos=all&stats=bat&type=sabersim&team=0&lg=all&players=0').forms.first
+  form['__EVENTTARGET'] = 'DFSBoard1$cmdCSV'
+  form['__EVENTARGUMENT'] = ''
+  CSV.parse(form.submit.body[3..-1], headers: true, header_converters: :downcase).each { |row| rows << row }
+
+  salaries.each do |salary|
+    player = rows.find { |row| salary['nickname'].downcase.gsub(' jr.', '') == row['name'].downcase.gsub(' jr.', '') }
+    if player
+      players << { player_name: player['name'],
+                   salary: salary['salary'],
+                   team: salary['team'],
+                   opponent: salary['opponent'],
+                   position: salary['position'],
+                   id: salary['id'],
+                   bat_order: salary['batting order'].to_i,
+                   fpts: (@config[:yahoo] ? player['yahoo'] : player['fanduel']).to_f }
+    elsif @config[:debug] && salary['batting order'] != '0' && salary['batting order'] != ''
+      puts "could not find projection for #{salary['nickname']}"
+    end
+  end
+  players.delete_if { |p| p[:salary].nil? || (p[:position] != 'P' && p[:bat_order] > MAX_BAT_ORDER) }
 end
 
 def get_players(salaries)
   if @config[:daily_fantasy_nerd]
     get_dfn_players(salaries)
+  elsif @config[:fangraphs]
+    get_fangraphs_players(salaries)
   else
     get_nathan_players(salaries)
   end
@@ -244,6 +279,7 @@ if __FILE__ == $0
     opts.on('-m=x', '--minimum-salary=x', Integer)     { |val| @config[:min_salary] = val }
     opts.on('-d=x', '--daily-fantasy-nerd=x')          { |val| @config[:daily_fantasy_nerd] = val }
     opts.on('-y',   '--yahoo')                         { |val| @config[:yahoo] = true }
+    opts.on('-f',   '--fangraphs')                     { |val| @config[:fangraphs] = true }
     opts.on('--debug')                                 { |val| @config[:debug] = val }
     opts.parse!
   end
